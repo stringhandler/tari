@@ -51,6 +51,7 @@ pub fn parse_cli_args() -> Arguments {
         (@arg log_config: -l --log_config +takes_value "A path to the logfile configuration (log4rs.yml))")
         (@arg init: --init "Create a default configuration file if it doesn't exist")
         (@arg create_id: --create_id "Create and save new node identity if one doesn't exist ")
+        (@arg data_dir: --data_dir +takes_value "A path to the data directory to use ($HOME/.tari)")
     )
     .get_matches();
 

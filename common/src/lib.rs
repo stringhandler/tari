@@ -71,28 +71,35 @@ pub const DEFAULT_LOG_CONFIG: &str = "log4rs.yml";
 
 /// A minimal parsed configuration object that's used to bootstrap the main Configuration.
 pub struct ConfigBootstrap {
+    /// The data directory to use. Default is `~/.tari`. (or OS equivalent)
+    pub data_dir: PathBuf,
     pub config: PathBuf,
     /// The path to the log configuration file. It is set using the following precedence set:
     ///   1. from the command-line parameter,
     ///   2. from the `TARI_LOG_CONFIGURATION` environment variable,
-    ///   3. from a default value, usually `~/.tari/log4rs.yml` (or OS equivalent).
+    ///   3. from a default value, usually `log4rs.yml` in `data_dir`.
     pub log_config: PathBuf,
 }
 
 impl Default for ConfigBootstrap {
     fn default() -> Self {
         ConfigBootstrap {
-            config: dir_utils::default_path(DEFAULT_CONFIG),
-            log_config: dir_utils::default_path(DEFAULT_LOG_CONFIG),
+            data_dir: dir_utils::default_data_dir(),
+            config: DEFAULT_CONFIG,
+            log_config: DEFAULT_LOG_CONFIG,
         }
     }
 }
 
 pub fn bootstrap_config_from_cli(matches: &ArgMatches) -> ConfigBootstrap {
+    let data_dir = matches
+        .value_of("data_dir")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dir_utils::default_data_dir());
     let config = matches
         .value_of("config")
         .map(PathBuf::from)
-        .unwrap_or_else(|| dir_utils::default_path(DEFAULT_CONFIG));
+        .unwrap_or_else(DEFAULT_CONFIG);
     let log_config = matches.value_of("log_config").map(PathBuf::from);
     let log_config = logging::get_log_configuration_path(log_config);
 
