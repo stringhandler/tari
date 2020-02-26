@@ -43,6 +43,7 @@ use std::sync::{
 };
 use tari_common::{load_configuration, GlobalConfig};
 use tokio::{runtime, runtime::Runtime};
+use tari_comms::peer_manager::PeerManager;
 
 pub const LOG_TARGET: &str = "base_node::app";
 
@@ -166,6 +167,8 @@ fn main_inner() -> Result<(), ExitCodes> {
         None
     };
 
+    let peer_manager = comms.peer_manager();
+
     // Run, node, run!
     let main = async move {
         node.run().await;
@@ -177,7 +180,7 @@ fn main_inner() -> Result<(), ExitCodes> {
     };
     let base_node_handle = rt.spawn(main);
 
-    cli_loop(flag, rt.handle().clone(), base_node_context);
+    cli_loop(flag, rt.handle().clone(), base_node_context, peer_manager);
     if let Some(miner) = miner_handle {
         rt.block_on(miner);
     }
@@ -205,8 +208,8 @@ fn setup_runtime(config: &GlobalConfig) -> Result<Runtime, String> {
         .map_err(|e| format!("There was an error while building the node runtime. {}", e.to_string()))
 }
 
-fn cli_loop(shutdown_flag: Arc<AtomicBool>, executor: runtime::Handle, base_node_context: BaseNodeContext) {
-    let parser = Parser::new(executor, base_node_context, shutdown_flag.clone());
+fn cli_loop(shutdown_flag: Arc<AtomicBool>, executor: runtime::Handle, base_node_context: BaseNodeContext, peer_manager: Arc<PeerManager>) {
+    let parser = Parser::new(executor, base_node_context, peer_manager, shutdown_flag.clone());
     let cli_config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
