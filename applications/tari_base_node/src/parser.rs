@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use super::LOG_TARGET;
-use crate::builder::BaseNodeContext;
+use crate::builder::{BaseNodeContext, NodeType};
 use log::*;
 use rustyline::{
     completion::Completer,
@@ -45,10 +45,16 @@ use tari_comms::types::CommsPublicKey;
 use tari_core::{
     tari_utilities::hex::Hex,
     transactions::tari_amount::{uT, MicroTari},
+    chain_storage::BlockchainBackend,
+    chain_storage::BlockchainDatabase
 };
 use tokio::runtime;
 use tari_comms::peer_manager::PeerManager;
 use serde_json::json;
+use tari_core::tari_utilities::hash::Hashable;
+use std::time::{UNIX_EPOCH, Duration};
+use chrono::prelude::DateTime;
+use chrono::Utc;
 
 /// Enum representing commands used by the basenode
 #[derive(Clone, PartialEq, Debug, Display, EnumIter, EnumString)]
@@ -58,6 +64,7 @@ pub enum BaseNodeCommand {
     GetBalance,
     SendTari,
     GetChainMetadata,
+    GetBlocks,
     GetPeers,
     Quit,
     Exit,
@@ -65,17 +72,18 @@ pub enum BaseNodeCommand {
 
 /// This is used to parse commands from the user and execute them
 #[derive(Helper, Validator, Highlighter)]
-pub struct Parser {
+pub struct Parser <T> where T:BlockchainBackend{
     executor: runtime::Handle,
     base_node_context: BaseNodeContext,
     peer_manager: Arc<PeerManager>,
+    blockchain_database: BlockchainDatabase<T>,
     shutdown_flag: Arc<AtomicBool>,
     commands: Vec<String>,
     hinter: HistoryHinter,
 }
 
 // This will go through all instructions and look for potential matches
-impl Completer for Parser {
+impl <T:BlockchainBackend> Completer for Parser<T> {
     type Candidate = String;
 
     fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<String>), ReadlineError> {
@@ -95,17 +103,18 @@ impl Completer for Parser {
 }
 
 // This allows us to make hints based on historic inputs
-impl Hinter for Parser {
+impl <T:BlockchainBackend> Hinter for Parser<T>{
     fn hint(&self, line: &str, pos: usize, ctx: &rustyline::Context<'_>) -> Option<String> {
         self.hinter.hint(line, pos, ctx)
     }
 }
 
-impl Parser {
+impl<T:BlockchainBackend> Parser<T> {
     /// creates a new parser struct
-    pub fn new(executor: runtime::Handle, base_node_context: BaseNodeContext, peer_manager: Arc<PeerManager>, shutdown_flag: Arc<AtomicBool>) -> Self {
-        Parser {
+    pub fn new(executor: runtime::Handle, blockchain_database: BlockchainDatabase<T>, base_node_context: BaseNodeContext, peer_manager: Arc<PeerManager>, shutdown_flag: Arc<AtomicBool>) -> Self {
+        Self{
             executor,
+            blockchain_database,
             base_node_context,
             peer_manager,
             shutdown_flag,
@@ -151,9 +160,12 @@ impl Parser {
             BaseNodeCommand::GetChainMetadata => {
                 println!("Gets your base node chain meta data");
             },
+            BaseNodeCommand::GetBlocks=> {
+println!("Gets a diagram of the block chain");
+            },
             BaseNodeCommand::GetPeers => {
                 println!("Lists the peers that this node is connected to");
-            }
+            },
             BaseNodeCommand::Exit | BaseNodeCommand::Quit => {
                 println!("Exits the base node");
             },
@@ -176,6 +188,9 @@ impl Parser {
             },
             BaseNodeCommand::GetChainMetadata => {
                 self.process_get_chain_meta();
+            },
+            BaseNodeCommand::GetBlocks => {
+                self.process_get_blocks(command_arg);
             },
             BaseNodeCommand::GetPeers => {
                 self.process_get_peers();
@@ -224,6 +239,35 @@ impl Parser {
                 Ok(data) => println!("Current meta data is is: {}", data),
             };
         });
+    }
+
+    fn process_get_blocks(&self, command_arg: Vec<&str>) {
+        let height = self.blockchain_database.get_height().unwrap_or(None).unwrap_or(0);
+        let mut num_blocks=  10;
+        if command_arg.len() > 1 {
+            num_blocks =
+                command_arg[1].parse::<u64>().unwrap_or(10);
+        }
+        if num_blocks > height {
+            num_blocks = height
+        }
+        println!("graph TD;");
+        for h in 0..num_blocks {
+            let blockheader = self.blockchain_database.fetch_header(height -1 - h).unwrap();
+            // Mermaid
+
+            println!("{}-->{}", blockheader.hash().to_hex().split_at(8).0, blockheader.prev_hash.to_hex().split_at(8).0);
+            //let d = datetime_to_timestamp(blockheader.timestamp);
+            let d = UNIX_EPOCH + Duration::from_secs(blockheader.timestamp.as_u64());
+            // Create DateTime from SystemTime
+            let datetime = DateTime::<Utc>::from(d);
+            // Formats the combined date and time with the specified format string.
+            let timestamp_str = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
+            println!("{}[{}  time:`{}`  height:`{}`]", blockheader.hash().to_hex().split_at(8).0,
+                     blockheader.hash().to_hex().split_at(8).0, timestamp_str, blockheader.height);
+
+        }
     }
 
     fn process_get_peers(&self) {

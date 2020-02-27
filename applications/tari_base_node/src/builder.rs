@@ -305,7 +305,7 @@ pub fn configure_and_initialize_node(
                 node_service: node_interface,
             };
             let miner = MinerType::Memory(miner::build_miner(handles, node.get_flag(), rules, executor));
-            (comms, node, miner, base_node_context)
+            (comms, node,  miner, base_node_context)
         },
         DatabaseType::LMDB(p) => {
             let rules = ConsensusManager::default();
@@ -361,7 +361,7 @@ pub fn configure_and_initialize_node(
                 node_service: node_interface,
             };
             let miner = MinerType::LMDB(miner::build_miner(handles, node.get_flag(), rules, executor));
-            (comms, node, miner, base_node_context)
+            (comms, node,  miner, base_node_context)
         },
     };
     Ok(result)

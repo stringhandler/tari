@@ -19,6 +19,7 @@ tari_wallet = { path = "../../base_layer/wallet", version = "^0.0" }
 tari_broadcast_channel = { version="^0.0",  path = "../../infrastructure/broadcast_channel" }
 
 clap = "2.33.0"
+chrono = "0.4.10"
 config = { version = "0.9.3" }
 dirs = "2.0.2"
 futures = { version = "^0.3.1", default-features = false, features = ["alloc"]}

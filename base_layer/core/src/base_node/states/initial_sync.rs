@@ -60,7 +60,7 @@ impl Default for InitialSync {
 
 impl InitialSync {
     pub fn new() -> Self {
-        let backoff = BackOff::new(MAX_SYNC_ATTEMPTS, Duration::from_secs(30), 1.0);
+        let backoff = BackOff::new(MAX_SYNC_ATTEMPTS, Duration::from_secs(5), 1.0);
         InitialSync {
             backoff,
             shutdown_votes: 0,

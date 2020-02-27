@@ -32,7 +32,7 @@ mod miner;
 /// Parser module used to control user commands
 mod parser;
 
-use crate::builder::{create_new_base_node_identity, load_identity, BaseNodeContext};
+use crate::builder::{create_new_base_node_identity, load_identity, BaseNodeContext, NodeType};
 use futures::stream::StreamExt;
 use log::*;
 use parser::Parser;
@@ -44,6 +44,7 @@ use std::sync::{
 use tari_common::{load_configuration, GlobalConfig};
 use tokio::{runtime, runtime::Runtime};
 use tari_comms::peer_manager::PeerManager;
+use tari_core::chain_storage::{BlockchainBackend, BlockchainDatabase};
 
 pub const LOG_TARGET: &str = "base_node::app";
 
@@ -140,7 +141,7 @@ fn main_inner() -> Result<(), ExitCodes> {
     };
 
     // Build, node, build!
-    let (comms, node, mut miner, base_node_context) =
+    let (comms, node,   mut miner, base_node_context) =
         builder::configure_and_initialize_node(&node_config, node_identity, &mut rt).map_err(|err| {
             error!(target: LOG_TARGET, "Could not instantiate node instance. {}", err);
             ExitCodes::UnknownError
@@ -168,6 +169,17 @@ fn main_inner() -> Result<(), ExitCodes> {
     };
 
     let peer_manager = comms.peer_manager();
+    match node{
+        NodeType::Memory(ref mem) => {
+            cli_loop(flag, rt.handle().clone(), base_node_context, peer_manager, mem.db.clone());
+
+        },
+        NodeType::LMDB(ref lmdb) =>
+            {
+                cli_loop(flag, rt.handle().clone(), base_node_context, peer_manager, lmdb.db.clone());
+
+            }
+    };
 
     // Run, node, run!
     let main = async move {
@@ -180,7 +192,7 @@ fn main_inner() -> Result<(), ExitCodes> {
     };
     let base_node_handle = rt.spawn(main);
 
-    cli_loop(flag, rt.handle().clone(), base_node_context, peer_manager);
+
     if let Some(miner) = miner_handle {
         rt.block_on(miner);
     }
@@ -208,8 +220,8 @@ fn setup_runtime(config: &GlobalConfig) -> Result<Runtime, String> {
         .map_err(|e| format!("There was an error while building the node runtime. {}", e.to_string()))
 }
 
-fn cli_loop(shutdown_flag: Arc<AtomicBool>, executor: runtime::Handle, base_node_context: BaseNodeContext, peer_manager: Arc<PeerManager>) {
-    let parser = Parser::new(executor, base_node_context, peer_manager, shutdown_flag.clone());
+fn cli_loop<T:BlockchainBackend>(shutdown_flag: Arc<AtomicBool>, executor: runtime::Handle, base_node_context: BaseNodeContext, peer_manager: Arc<PeerManager>, db: BlockchainDatabase<T>) {
+    let parser = Parser::<T>::new(executor, db, base_node_context, peer_manager, shutdown_flag.clone());
     let cli_config = Config::builder()
         .history_ignore_space(true)
         .completion_type(CompletionType::List)
