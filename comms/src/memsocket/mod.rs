@@ -508,17 +508,19 @@ mod test {
 
     #[test]
     fn listener_bind() -> Result<()> {
-        let listener = MemoryListener::bind(42)?;
-        assert_eq!(listener.local_addr(), 42);
+        let port = acquire_next_memsocket_port();
+        let listener = MemoryListener::bind(port.get())?;
+        assert_eq!(listener.local_addr(), port.get());
 
         Ok(())
     }
 
     #[test]
     fn simple_connect() -> Result<()> {
-        let mut listener = MemoryListener::bind(10)?;
+        let port = acquire_next_memsocket_port();
+        let mut listener = MemoryListener::bind(port.get())?;
 
-        let mut dialer = MemorySocket::connect(10)?;
+        let mut dialer = MemorySocket::connect(port.get())?;
         let mut listener_socket = block_on(listener.incoming().next()).unwrap()?;
 
         block_on(dialer.write_all(b"foo"))?;
