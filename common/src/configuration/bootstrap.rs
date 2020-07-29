@@ -51,7 +51,7 @@ use super::{
     error::ConfigError,
     utils::{install_default_config_file, load_configuration},
 };
-use crate::{dir_utils, initialize_logging, logging, DEFAULT_CONFIG, DEFAULT_LOG_CONFIG};
+use crate::{dir_utils, initialize_logging, logging, DEFAULT_CONFIG, DEFAULT_LOG_CONFIG, DEFAULT_WALLET_LOG_CONFIG};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -112,7 +112,7 @@ impl ConfigBootstrap {
     ///
     /// Without `--init` flag provided configuration and directories will be created only
     /// after user's confirmation.
-    pub fn init_dirs(&mut self) -> Result<(), ConfigError> {
+    pub fn init_dirs(&mut self, application_type: ApplicationType) -> Result<(), ConfigError> {
         if self.base_path.to_str() == Some("") {
             self.base_path = dir_utils::default_path("", None);
         } else {
@@ -132,7 +132,14 @@ impl ConfigBootstrap {
         }
 
         if self.log_config.to_str() == Some("") {
-            self.log_config = dir_utils::default_path(DEFAULT_LOG_CONFIG, Some(&self.base_path));
+            match application_type {
+                ApplicationType::BaseNode => {
+                    self.log_config = dir_utils::default_path(DEFAULT_LOG_CONFIG, Some(&self.base_path));
+                },
+                ApplicationType::ConsoleWallet => {
+                    self.log_config = dir_utils::default_path(DEFAULT_WALLET_LOG_CONFIG, Some(&self.base_path));
+                },
+            }
         }
 
         if !self.config.exists() {
@@ -164,7 +171,14 @@ impl ConfigBootstrap {
                     "Installing new logfile configuration at {}",
                     self.log_config.to_str().unwrap_or("[??]")
                 );
-                install_configuration(&self.log_config, logging::install_default_logfile_config);
+                match application_type {
+                    ApplicationType::BaseNode => {
+                        install_configuration(&self.log_config, logging::install_default_logfile_config)
+                    },
+                    ApplicationType::ConsoleWallet => {
+                        install_configuration(&self.log_config, logging::install_default_wallet_logfile_config)
+                    },
+                }
             }
         };
         Ok(())
@@ -176,7 +190,7 @@ impl ConfigBootstrap {
         if initialize_logging(&self.log_config) {
             Ok(())
         } else {
-            Err(ConfigError::new("failed to initalize logging", None))
+            Err(ConfigError::new("Failed to initialize logging", None))
         }
     }
 
@@ -205,9 +219,15 @@ where F: Fn(&Path) -> Result<(), std::io::Error> {
     }
 }
 
+pub enum ApplicationType {
+    BaseNode,
+    ConsoleWallet,
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
+        configuration::bootstrap::ApplicationType,
         dir_utils,
         dir_utils::default_subdir,
         load_configuration,
@@ -281,7 +301,9 @@ mod test {
                 .expect("failed to process arguments");
 
         // Initialize bootstrap dirs
-        bootstrap.init_dirs().expect("failed to initialize dirs");
+        bootstrap
+            .init_dirs(ApplicationType::BaseNode)
+            .expect("failed to initialize dirs");
         let config_exists = std::path::Path::new(&bootstrap.config).exists();
         let log_config_exists = std::path::Path::new(&bootstrap.log_config).exists();
         // Load and apply configuration file

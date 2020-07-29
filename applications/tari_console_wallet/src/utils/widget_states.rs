@@ -55,6 +55,13 @@ where T: Clone
 impl<T> StatefulList<T>
 where T: Clone
 {
+    pub fn new() -> StatefulList<T> {
+        StatefulList {
+            state: ListState::default(),
+            items: Vec::new(),
+        }
+    }
+
     pub fn with_items(items: Vec<T>) -> StatefulList<T> {
         StatefulList {
             state: ListState::default(),
