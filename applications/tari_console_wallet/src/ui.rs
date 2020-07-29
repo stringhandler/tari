@@ -261,14 +261,14 @@ where B: Backend {
 
 fn draw_transaction_lists<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
 where B: Backend {
-    let total = app.pending_txs.len() + app.completed_txs.len();
-    let (pending_constraint, completed_constaint) = if app.pending_txs.len() == 0 {
+    let total = app.app_state.pending_txs.len() + app.app_state.completed_txs.len();
+    let (pending_constraint, completed_constaint) = if app.app_state.pending_txs.len() == 0 {
         (Constraint::Min(4), Constraint::Min(4))
     } else {
-        if app.pending_txs.len() as f32 / total as f32 > 0.25 {
+        if app.app_state.pending_txs.len() as f32 / total as f32 > 0.25 {
             (
-                Constraint::Ratio(app.pending_txs.len() as u32, total as u32),
-                Constraint::Ratio(app.completed_txs.len() as u32, total as u32),
+                Constraint::Ratio(app.app_state.pending_txs.len() as u32, total as u32),
+                Constraint::Ratio(app.app_state.completed_txs.len() as u32, total as u32),
             )
         } else {
             (Constraint::Max(5), Constraint::Min(4))
@@ -306,7 +306,7 @@ where B: Backend {
     let mut column1_items = Vec::new();
     let mut column2_items = Vec::new();
     let mut column3_items = Vec::new();
-    for t in app.pending_txs.items.iter() {
+    for t in app.app_state.pending_txs.items.iter() {
         if t.direction == TransactionDirection::Outbound {
             column0_items.push(ListItem::new(Span::raw(format!("{}", t.destination_public_key))));
             column1_items.push(ListItem::new(Span::styled(
@@ -335,7 +335,7 @@ where B: Backend {
         .add_column(Some("Amount"), Some(18), column1_items)
         .add_column(Some("Timestamp"), Some(20), column2_items)
         .add_column(Some("Message"), None, column3_items);
-    column_list.render(f, list_areas[0], &mut app.pending_txs.state);
+    column_list.render(f, list_areas[0], &mut app.app_state.pending_txs.state);
 
     //  Completed Transactions
     let style = if app.selected_tx_list == SelectedTransactionList::CompletedTxs {
@@ -352,7 +352,7 @@ where B: Backend {
     let mut column1_items = Vec::new();
     let mut column2_items = Vec::new();
     let mut column3_items = Vec::new();
-    for t in app.completed_txs.items.iter() {
+    for t in app.app_state.completed_txs.items.iter() {
         if t.direction == TransactionDirection::Outbound {
             column0_items.push(ListItem::new(Span::raw(format!("{}", t.destination_public_key))));
             column1_items.push(ListItem::new(Span::styled(
@@ -381,7 +381,7 @@ where B: Backend {
         .add_column(Some("Amount"), Some(18), column1_items)
         .add_column(Some("Timestamp"), Some(20), column2_items)
         .add_column(Some("Status"), None, column3_items);
-    column_list.render(f, list_areas[1], &mut app.completed_txs.state);
+    column_list.render(f, list_areas[1], &mut app.app_state.completed_txs.state);
 }
 
 fn draw_detailed_transaction<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
@@ -446,7 +446,7 @@ where B: Backend {
 
     // Content:
 
-    if let Some(tx) = app.detailed_transaction.as_ref() {
+    if let Some(tx) = app.app_state.detailed_transaction.as_ref() {
         let content_layout = Layout::default()
             .constraints(
                 [
@@ -591,11 +591,11 @@ where B: Backend {
 
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(42), Constraint::Min(1)].as_ref())
+        .constraints([Constraint::Length(46), Constraint::Min(1)].as_ref())
         .margin(1)
         .split(help_body_area[0]);
 
-    let qr_code = Paragraph::new(app.my_identity.qr_code)
+    let qr_code = Paragraph::new(app.app_state.my_identity.qr_code.as_str())
         .block(Block::default())
         .wrap(Wrap { trim: true });
     f.render_widget(qr_code, chunks[0]);
@@ -622,7 +622,7 @@ where B: Backend {
         .constraints([Constraint::Length(1)].as_ref())
         .margin(1)
         .split(info_chunks[0]);
-    let public_key = Paragraph::new(app.my_identity.public_key);
+    let public_key = Paragraph::new(app.app_state.my_identity.public_key.as_str());
     f.render_widget(public_key, label_layout[0]);
 
     // Public Address
@@ -634,7 +634,7 @@ where B: Backend {
         .constraints([Constraint::Length(1)].as_ref())
         .margin(1)
         .split(info_chunks[1]);
-    let public_address = Paragraph::new(app.my_identity.public_address);
+    let public_address = Paragraph::new(app.app_state.my_identity.public_address.as_str());
     f.render_widget(public_address, label_layout[0]);
 
     // Emoji ID
@@ -646,7 +646,7 @@ where B: Backend {
         .constraints([Constraint::Length(1)].as_ref())
         .margin(1)
         .split(info_chunks[2]);
-    let emoji_id = Paragraph::new(app.my_identity.emoji_id);
+    let emoji_id = Paragraph::new(app.app_state.my_identity.emoji_id.as_str());
     f.render_widget(emoji_id, label_layout[0]);
 }
 
@@ -675,7 +675,7 @@ where B: Backend {
     let mut column0_items = Vec::new();
     let mut column1_items = Vec::new();
     let mut column2_items = Vec::new();
-    for c in app.contacts.items.iter() {
+    for c in app.app_state.contacts.items.iter() {
         column0_items.push(ListItem::new(Span::raw(c.alias.clone())));
         column1_items.push(ListItem::new(Span::raw(c.public_key.to_string())));
         column2_items.push(ListItem::new(Span::raw(display_compressed_string(
@@ -691,5 +691,5 @@ where B: Backend {
         .add_column(Some("Alias"), Some(12), column0_items)
         .add_column(Some("Public Key"), Some(67), column1_items)
         .add_column(Some("Emoji ID"), None, column2_items);
-    column_list.render(f, list_areas[1], &mut app.contacts.state);
+    column_list.render(f, list_areas[1], &mut app.app_state.contacts.state);
 }

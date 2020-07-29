@@ -21,24 +21,35 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{
-    dummy_data::{dummy_completed_txs, dummy_inbound_txs, dummy_outbound_txs, get_dummy_contacts, get_dummy_identity},
+    dummy_data::get_dummy_contacts,
     utils::widget_states::{StatefulList, TabsState},
 };
+use log::*;
+use qrcode::{render::unicode, QrCode};
+use std::sync::Arc;
+use tari_common::Network;
+use tari_comms::NodeIdentity;
+use tari_crypto::tari_utilities::hex::Hex;
 use tari_wallet::{
-    contacts_service::storage::database::Contact,
-    transaction_service::storage::database::CompletedTransaction,
+    contacts_service::storage::{database::Contact, sqlite_db::ContactsServiceSqliteDatabase},
+    output_manager_service::storage::sqlite_db::OutputManagerSqliteDatabase,
+    storage::sqlite_db::WalletSqliteDatabase,
+    transaction_service::storage::{database::CompletedTransaction, sqlite_db::TransactionServiceSqliteDatabase},
     util::emoji::EmojiId,
+    Wallet,
 };
 
 pub struct App<'a> {
     pub title: &'a str,
     pub should_quit: bool,
+    pub wallet: Wallet<
+        WalletSqliteDatabase,
+        TransactionServiceSqliteDatabase,
+        OutputManagerSqliteDatabase,
+        ContactsServiceSqliteDatabase,
+    >,
     // Cached state this will need to be cleaned up into a threadsafe container
-    pub pending_txs: StatefulList<CompletedTransaction>,
-    pub completed_txs: StatefulList<CompletedTransaction>,
-    pub detailed_transaction: Option<CompletedTransaction>,
-    pub my_identity: MyIdentity<'a>,
-    pub contacts: StatefulList<UiContact>,
+    pub app_state: AppState,
     // Ui working state
     pub tabs: TabsState<'a>,
     pub selected_tx_list: SelectedTransactionList,
@@ -49,42 +60,29 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub fn new(title: &'a str) -> App<'a> {
-        let mut pending_transactions: Vec<CompletedTransaction> = Vec::new();
-        pending_transactions.extend(
-            dummy_inbound_txs()
-                .iter()
-                .map(|i| CompletedTransaction::from(i.clone()))
-                .collect::<Vec<CompletedTransaction>>(),
-        );
-        pending_transactions.extend(
-            dummy_outbound_txs()
-                .iter()
-                .map(|i| CompletedTransaction::from(i.clone()))
-                .collect::<Vec<CompletedTransaction>>(),
-        );
-        pending_transactions.sort_by(|a: &CompletedTransaction, b: &CompletedTransaction| {
-            b.timestamp.partial_cmp(&a.timestamp).unwrap()
-        });
+    pub fn new(
+        title: &'a str,
+        wallet: Wallet<
+            WalletSqliteDatabase,
+            TransactionServiceSqliteDatabase,
+            OutputManagerSqliteDatabase,
+            ContactsServiceSqliteDatabase,
+        >,
+        network: Network,
+    ) -> App<'a>
+    {
+        let app_state = AppState::new(wallet.comms.node_identity(), network);
 
         Self {
             title,
+            wallet,
             should_quit: false,
+            app_state,
             tabs: TabsState::new(vec!["Transactions", "Send/Receive", "Network"]),
-            pending_txs: StatefulList::with_items(pending_transactions),
-            completed_txs: StatefulList::with_items(dummy_completed_txs()),
-            detailed_transaction: None,
             selected_tx_list: SelectedTransactionList::None,
             to_field: "".to_string(),
             amount_field: "".to_string(),
             send_input_mode: SendInputMode::None,
-            my_identity: get_dummy_identity(),
-            contacts: StatefulList::with_items(
-                get_dummy_contacts()
-                    .iter()
-                    .map(|c| UiContact::from(c.clone()))
-                    .collect(),
-            ),
             show_contacts: false,
         }
     }
@@ -113,21 +111,21 @@ impl<'a> App<'a> {
             match c {
                 'p' => {
                     self.selected_tx_list = SelectedTransactionList::PendingTxs;
-                    self.pending_txs.select_first();
-                    self.completed_txs.unselect();
+                    self.app_state.pending_txs.select_first();
+                    self.app_state.completed_txs.unselect();
                 },
                 'c' => {
                     self.selected_tx_list = SelectedTransactionList::CompletedTxs;
-                    self.pending_txs.unselect();
-                    self.completed_txs.select_first();
+                    self.app_state.pending_txs.unselect();
+                    self.app_state.completed_txs.select_first();
                 },
                 '\n' => match self.selected_tx_list {
                     SelectedTransactionList::None => {},
                     SelectedTransactionList::PendingTxs => {
-                        self.detailed_transaction = self.pending_txs.selected_item();
+                        self.app_state.detailed_transaction = self.app_state.pending_txs.selected_item();
                     },
                     SelectedTransactionList::CompletedTxs => {
-                        self.detailed_transaction = self.completed_txs.selected_item();
+                        self.app_state.detailed_transaction = self.app_state.completed_txs.selected_item();
                     },
                 },
                 _ => {},
@@ -141,7 +139,7 @@ impl<'a> App<'a> {
                     'a' => self.send_input_mode = SendInputMode::Amount,
                     '\n' => {
                         if self.show_contacts {
-                            if let Some(c) = self.contacts.selected_item().as_ref() {
+                            if let Some(c) = self.app_state.contacts.selected_item().as_ref() {
                                 self.to_field = c.public_key.clone();
                                 self.show_contacts = false;
                             }
@@ -175,17 +173,17 @@ impl<'a> App<'a> {
             match self.selected_tx_list {
                 SelectedTransactionList::None => {},
                 SelectedTransactionList::PendingTxs => {
-                    self.pending_txs.previous();
-                    self.detailed_transaction = self.pending_txs.selected_item();
+                    self.app_state.pending_txs.previous();
+                    self.app_state.detailed_transaction = self.app_state.pending_txs.selected_item();
                 },
                 SelectedTransactionList::CompletedTxs => {
-                    self.completed_txs.previous();
-                    self.detailed_transaction = self.completed_txs.selected_item();
+                    self.app_state.completed_txs.previous();
+                    self.app_state.detailed_transaction = self.app_state.completed_txs.selected_item();
                 },
             }
         }
         if self.tabs.index == 1 {
-            self.contacts.previous();
+            self.app_state.contacts.previous();
         }
     }
 
@@ -194,17 +192,17 @@ impl<'a> App<'a> {
             match self.selected_tx_list {
                 SelectedTransactionList::None => {},
                 SelectedTransactionList::PendingTxs => {
-                    self.pending_txs.next();
-                    self.detailed_transaction = self.pending_txs.selected_item();
+                    self.app_state.pending_txs.next();
+                    self.app_state.detailed_transaction = self.app_state.pending_txs.selected_item();
                 },
                 SelectedTransactionList::CompletedTxs => {
-                    self.completed_txs.next();
-                    self.detailed_transaction = self.completed_txs.selected_item();
+                    self.app_state.completed_txs.next();
+                    self.app_state.detailed_transaction = self.app_state.completed_txs.selected_item();
                 },
             }
         }
         if self.tabs.index == 1 {
-            self.contacts.next();
+            self.app_state.contacts.next();
         }
     }
 
@@ -238,6 +236,93 @@ impl<'a> App<'a> {
     }
 
     pub fn on_tick(&mut self) {}
+
+    pub fn refresh_state(&mut self) {
+        let mut pending_transactions: Vec<CompletedTransaction> = Vec::new();
+        if let Ok(pending_inbound) = self
+            .wallet
+            .runtime
+            .block_on(self.wallet.transaction_service.get_pending_inbound_transactions())
+        {
+            pending_transactions.extend(
+                pending_inbound
+                    .values()
+                    .map(|t| CompletedTransaction::from(t.clone()))
+                    .collect::<Vec<CompletedTransaction>>(),
+            );
+        }
+        if let Ok(pending_outbound) = self
+            .wallet
+            .runtime
+            .block_on(self.wallet.transaction_service.get_pending_inbound_transactions())
+        {
+            pending_transactions.extend(
+                pending_outbound
+                    .values()
+                    .map(|t| CompletedTransaction::from(t.clone()))
+                    .collect::<Vec<CompletedTransaction>>(),
+            );
+        }
+
+        pending_transactions.sort_by(|a: &CompletedTransaction, b: &CompletedTransaction| {
+            b.timestamp.partial_cmp(&a.timestamp).unwrap()
+        });
+
+        let completed_transactions = if let Ok(txs) = self
+            .wallet
+            .runtime
+            .block_on(self.wallet.transaction_service.get_completed_transactions())
+        {
+            txs.values().map(|t| t.clone()).collect()
+        } else {
+            Vec::new()
+        };
+
+        self.app_state.pending_txs.items = pending_transactions;
+        self.app_state.completed_txs.items = completed_transactions;
+    }
+}
+
+pub struct AppState {
+    pub pending_txs: StatefulList<CompletedTransaction>,
+    pub completed_txs: StatefulList<CompletedTransaction>,
+    pub detailed_transaction: Option<CompletedTransaction>,
+    pub my_identity: MyIdentity,
+    pub contacts: StatefulList<UiContact>,
+}
+
+impl AppState {
+    pub fn new(node_identity: Arc<NodeIdentity>, network: Network) -> Self {
+        let eid = EmojiId::from_pubkey(node_identity.public_key()).to_string();
+        let qr_link = format!("tari://{}/pubkey/{}", network, &node_identity.public_key().to_hex());
+        let code = QrCode::new(qr_link).unwrap();
+        let image = code
+            .render::<unicode::Dense1x2>()
+            .dark_color(unicode::Dense1x2::Dark)
+            .light_color(unicode::Dense1x2::Light)
+            .build()
+            .trim()
+            .to_string();
+
+        let identity = MyIdentity {
+            public_key: node_identity.public_key().to_string(),
+            public_address: node_identity.public_address().to_string(),
+            emoji_id: eid,
+            qr_code: image,
+        };
+        AppState {
+            pending_txs: StatefulList::new(),
+            completed_txs: StatefulList::new(),
+            detailed_transaction: None,
+            my_identity: identity,
+            contacts: StatefulList::with_items(
+                get_dummy_contacts()
+                    .iter()
+                    .map(|c| UiContact::from(c.clone()))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -253,11 +338,11 @@ pub enum SendInputMode {
     Amount,
 }
 
-pub struct MyIdentity<'a> {
-    pub public_key: &'a str,
-    pub public_address: &'a str,
-    pub emoji_id: &'a str,
-    pub qr_code: &'a str,
+pub struct MyIdentity {
+    pub public_key: String,
+    pub public_address: String,
+    pub emoji_id: String,
+    pub qr_code: String,
 }
 
 #[derive(Clone)]
