@@ -109,7 +109,7 @@ pub const LOG_TARGET: &str = "base_node::app";
 fn main() {
     match main_inner() {
         Ok(_) => std::process::exit(0),
-        Err(exit_code) => std::process::exit(exit_code as i32),
+        Err(exit_code) => std::process::exit(exit_code.as_i32()),
     }
 }
 

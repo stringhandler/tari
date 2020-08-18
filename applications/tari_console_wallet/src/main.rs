@@ -1,15 +1,11 @@
 use crate::{
-    app::App,
+    ui::App,
     utils::{
         crossterm_events::CrosstermEvents,
         events::{Event, EventStream},
     },
 };
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyModifiers},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
+
 use log::*;
 use std::{
     io::{stdout, Write},
@@ -27,17 +23,24 @@ use tari_app_utilities::utilities::{
 use tari_common::{ConfigBootstrap, GlobalConfig, Network};
 use tari_core::{consensus::Network as NetworkType, transactions::types::CryptoFactories};
 
+use std::io::Stdout;
 use tari_app_utilities::identity_management::setup_node_identity;
 use tari_common::configuration::bootstrap::ApplicationType;
 use tari_comms::{peer_manager::PeerFeatures, NodeIdentity};
 use tari_comms_dht::{DbConnectionUrl, DhtConfig};
 use tari_p2p::initialization::CommsConfig;
 use tari_wallet::{
+    contacts_service::storage::sqlite_db::ContactsServiceSqliteDatabase,
     error::WalletError,
-    storage::sqlite_utilities::initialize_sqlite_database_backends,
-    transaction_service::config::TransactionServiceConfig,
+    output_manager_service::storage::sqlite_db::OutputManagerSqliteDatabase,
+    storage::{sqlite_db::WalletSqliteDatabase, sqlite_utilities::initialize_sqlite_database_backends},
+    transaction_service::{config::TransactionServiceConfig, storage::sqlite_db::TransactionServiceSqliteDatabase},
     wallet::WalletConfig,
     Wallet,
+};
+use tokio::{
+    runtime::{Handle, Runtime},
+    sync::RwLock,
 };
 use tui::{backend::CrosstermBackend, Terminal};
 
@@ -48,7 +51,6 @@ pub const LOG_TARGET: &str = "wallet::app::main";
 /// The minimum buffer size for a tari application pubsub_connector channel
 const BASE_NODE_BUFFER_MIN_SIZE: usize = 30;
 
-mod app;
 mod dummy_data;
 mod ui;
 mod utils;
@@ -57,7 +59,11 @@ mod utils;
 fn main() {
     match main_inner() {
         Ok(_) => std::process::exit(0),
-        Err(exit_code) => std::process::exit(exit_code as i32),
+        Err(exit_code) => {
+            eprintln!("Exiting with code: {}", exit_code);
+            error!(target: LOG_TARGET, "Exiting with code: {}", exit_code);
+            std::process::exit(exit_code.as_i32())
+        },
     }
 }
 
@@ -105,40 +111,67 @@ fn main_inner() -> Result<(), ExitCodes> {
         info!(target: LOG_TARGET, "Default configuration created. Done.");
         return Ok(());
     }
+    let runtime = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .build()
+        .unwrap();
 
-    let app = setup_app(&node_config, wallet_identity)?;
+    let wallet = setup_wallet(&node_config, wallet_identity, runtime)?;
+    debug!(target: LOG_TARGET, "Starting app");
+    let handle = wallet.runtime.handle().clone();
 
-    crossterm_loop(app)
+    let node_identity = wallet.comms.node_identity().as_ref().clone();
+    let wallet = Arc::new(RwLock::new(wallet));
+    if !bootstrap.daemon_mode {
+        let mut app = App::<CrosstermBackend<Stdout>>::new(
+            "Tari Console Wallet".into(),
+            &node_identity,
+            wallet.clone(),
+            node_config.network,
+        );
+        handle.enter(|| ui::run(app));
+        println!("The wallet is shutting down.");
+        info!(
+            target: LOG_TARGET,
+            "Termination signal received from user. Shutting wallet down."
+        );
+        // TODO: Shutdown wallet
+        Ok(())
+    } else {
+        Ok(())
+    }
 }
 
 /// Setup the app environment and state for use by the UI
-fn setup_app(config: &GlobalConfig, node_identity: Arc<NodeIdentity>) -> Result<App, ExitCodes> {
-    let runtime = setup_runtime(&config).map_err(|err| {
-        error!(target: LOG_TARGET, "{}", err);
-        ExitCodes::UnknownError
-    })?;
-
+fn setup_wallet(
+    config: &GlobalConfig,
+    node_identity: Arc<NodeIdentity>,
+    runtime: Runtime,
+) -> Result<
+    Wallet<
+        WalletSqliteDatabase,
+        TransactionServiceSqliteDatabase,
+        OutputManagerSqliteDatabase,
+        ContactsServiceSqliteDatabase,
+    >,
+    ExitCodes,
+>
+{
     create_wallet_folder(
         &config
             .wallet_db_file
             .parent()
             .expect("wallet_db_file cannot be set to a root directory"),
     )
-    .map_err(|e| {
-        error!(target: LOG_TARGET, "Error creating Wallet folder. {}", e);
-        ExitCodes::WalletError
-    })?;
-    create_peer_db_folder(&config.wallet_peer_db_path).map_err(|e| {
-        error!(target: LOG_TARGET, "Error creating peer db folder. {}", e);
-        ExitCodes::WalletError
-    })?;
+    .map_err(|e| ExitCodes::WalletError(format!("Error creating Wallet folder. {}", e)))?;
+    create_peer_db_folder(&config.wallet_peer_db_path)
+        .map_err(|e| ExitCodes::WalletError(format!("Error creating peer db folder. {}", e)))?;
 
     debug!(target: LOG_TARGET, "Running Wallet database migrations");
     let (wallet_backend, transaction_backend, output_manager_backend, contacts_backend) =
-        initialize_sqlite_database_backends(config.wallet_db_file.clone(), None).map_err(|e| {
-            error!(target: LOG_TARGET, "Error creating Wallet database backends. {}", e);
-            ExitCodes::WalletError
-        })?;
+        initialize_sqlite_database_backends(config.wallet_db_file.clone(), None)
+            .map_err(|e| ExitCodes::WalletError(format!("Error creating Wallet database backends. {}", e)))?;
     debug!(target: LOG_TARGET, "Databases Initialized");
 
     // TODO remove after next TestNet
@@ -191,16 +224,10 @@ fn setup_app(config: &GlobalConfig, node_identity: Arc<NodeIdentity>) -> Result<
     )
     .map_err(|e| {
         if let WalletError::CommsInitializationError(ce) = e {
-            error!(
-                target: LOG_TARGET,
-                "Error initializing Comms: {}",
-                ce.to_friendly_string()
-            );
+            ExitCodes::WalletError(format!("Error initializing Comms: {}", ce.to_friendly_string()))
         } else {
-            error!(target: LOG_TARGET, "Error creating Wallet Container: {:?}", e);
+            ExitCodes::WalletError(format!("Error creating Wallet Container: {:?}", e))
         }
-
-        ExitCodes::WalletError
     })?;
 
     // TODO update this to come from an explicit config field. This will be replaced by gRPC interface.
@@ -215,90 +242,8 @@ fn setup_app(config: &GlobalConfig, node_identity: Arc<NodeIdentity>) -> Result<
                     .expect("The seed peers should have an address")
                     .to_string(),
             )
-            .map_err(|e| {
-                error!(target: LOG_TARGET, "Error setting wallet base node peer. {}", e);
-                ExitCodes::WalletError
-            })?;
+            .map_err(|e| ExitCodes::WalletError(format!("Error setting wallet base node peer. {}", e)))?;
     }
 
-    let mut app = App::new("Tari Console Wallet", wallet, config.network);
-    app.refresh_state();
-
-    Ok(app)
-}
-
-/// This is the main loop of the application UI using Crossterm based events
-fn crossterm_loop(mut app: App) -> Result<(), ExitCodes> {
-    let events = CrosstermEvents::new();
-    enable_raw_mode().map_err(|e| {
-        error!(target: LOG_TARGET, "Error enabling Raw Mode {}", e);
-        ExitCodes::InterfaceError
-    })?;
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen).map_err(|e| {
-        error!(target: LOG_TARGET, "Error creating stdout context. {}", e);
-        ExitCodes::InterfaceError
-    })?;
-
-    let backend = CrosstermBackend::new(stdout);
-
-    let mut terminal = Terminal::new(backend).map_err(|e| {
-        error!(target: LOG_TARGET, "Error creating Terminal context. {}", e);
-        ExitCodes::InterfaceError
-    })?;
-
-    loop {
-        terminal.draw(|f| ui::draw(f, &mut app)).map_err(|e| {
-            error!(target: LOG_TARGET, "Error drawing interface. {}", e);
-            ExitCodes::InterfaceError
-        })?;
-
-        match events.next().map_err(|e| {
-            error!(target: LOG_TARGET, "Error reading input event: {}", e);
-            ExitCodes::InterfaceError
-        })? {
-            Event::Input(event) => match (event.code, event.modifiers) {
-                (KeyCode::Char(c), KeyModifiers::CONTROL) => app.on_control_key(c),
-                (KeyCode::Char(c), _) => app.on_key(c),
-                (KeyCode::Left, _) => app.on_left(),
-                (KeyCode::Up, _) => app.on_up(),
-                (KeyCode::Right, _) => app.on_right(),
-                (KeyCode::Down, _) => app.on_down(),
-                (KeyCode::Esc, _) => app.on_esc(),
-                (KeyCode::Backspace, _) => app.on_backspace(),
-                (KeyCode::Enter, _) => app.on_key('\n'),
-                (KeyCode::Tab, _) => app.on_key('\t'),
-                _ => {},
-            },
-            Event::Tick => {
-                app.on_tick();
-            },
-        }
-        if app.should_quit {
-            break;
-        }
-    }
-
-    disable_raw_mode().map_err(|e| {
-        error!(target: LOG_TARGET, "Error disabling Raw Mode {}", e);
-        ExitCodes::InterfaceError
-    })?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).map_err(|e| {
-        error!(target: LOG_TARGET, "Error releasing stdout {}", e);
-        ExitCodes::InterfaceError
-    })?;
-    terminal.show_cursor().map_err(|e| {
-        error!(target: LOG_TARGET, "Error showing cursor: {}", e);
-        ExitCodes::InterfaceError
-    })?;
-
-    println!("The wallet is shutting down.");
-    info!(
-        target: LOG_TARGET,
-        "Termination signal received from user. Shutting wallet down."
-    );
-
-    app.wallet.shutdown();
-
-    Ok(())
+    Ok(wallet)
 }

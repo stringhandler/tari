@@ -90,6 +90,9 @@ pub struct ConfigBootstrap {
     /// Create and save new node identity if one doesn't exist
     #[structopt(long, alias("create_id"))]
     pub create_id: bool,
+    /// Run in daemon mode, with no interface
+    #[structopt(short, long, alias("daemon"))]
+    pub daemon_mode: bool,
 }
 
 impl Default for ConfigBootstrap {
@@ -100,6 +103,7 @@ impl Default for ConfigBootstrap {
             log_config: dir_utils::default_path(DEFAULT_LOG_CONFIG, None),
             init: false,
             create_id: false,
+            daemon_mode: false,
         }
     }
 }

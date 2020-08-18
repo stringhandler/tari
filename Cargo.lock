@@ -3590,7 +3590,7 @@ dependencies = [
 
 [[package]]
 name = "tari_comms_dht"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "bitflags 1.2.1",
  "bytes 0.4.12",
@@ -3651,6 +3651,7 @@ dependencies = [
  "tari_crypto",
  "tari_p2p",
  "tari_wallet",
+ "thiserror",
  "tokio",
  "tui",
  "unicode-segmentation",
