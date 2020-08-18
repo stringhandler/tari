@@ -22,7 +22,7 @@
 
 use crate::identity_management::load_from_json;
 use log::*;
-use std::{fs, path::Path};
+use std::{fmt, fmt::Formatter, fs, path::Path};
 use tari_common::{CommsTransport, GlobalConfig, SocksAuthentication, TorControlAuthentication};
 use tari_comms::{
     multiaddr::{Multiaddr, Protocol},
@@ -38,20 +38,41 @@ use tari_crypto::tari_utilities::hex::Hex;
 use tari_p2p::transport::{TorConfig, TransportType};
 use tokio::runtime::Runtime;
 
-pub const LOG_TARGET: &str = "tari_application";
+pub const LOG_TARGET: &str = "tari::application";
 
 /// Enum to show failure information
+#[derive(Clone)]
 pub enum ExitCodes {
-    ConfigError = 101,
-    UnknownError = 102,
-    InterfaceError = 103,
-    WalletError = 104,
+    ConfigError,
+    UnknownError,
+    InterfaceError,
+    WalletError(String),
+}
+
+impl ExitCodes {
+    pub fn as_i32(&self) -> i32 {
+        match self {
+            Self::ConfigError => 101,
+            Self::UnknownError => 102,
+            Self::InterfaceError => 103,
+            Self::WalletError(_) => 104,
+        }
+    }
 }
 
 impl From<tari_common::ConfigError> for ExitCodes {
     fn from(err: tari_common::ConfigError) -> Self {
         error!(target: LOG_TARGET, "{}", err);
         Self::ConfigError
+    }
+}
+
+impl fmt::Display for ExitCodes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ExitCodes::WalletError(e) => write!(f, "Wallet Error ({}): {}", self.as_i32(), e),
+            _ => write!(f, "{}", self.as_i32()),
+        }
     }
 }
 
