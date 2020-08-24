@@ -20,6 +20,43 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub mod blocks;
-pub mod helpers;
-pub mod base_node_grpc_server;
+use std::convert::{TryFrom, TryInto};
+use tari_core::{
+    proto::utils::try_convert_all,
+    transactions::{
+        aggregated_body::AggregateBody,
+        bullet_rangeproofs::BulletRangeProof,
+        tari_amount::MicroTari,
+        transaction::{
+            KernelFeatures,
+            OutputFeatures,
+            OutputFlags,
+            TransactionInput,
+            TransactionKernel,
+            TransactionOutput,
+        },
+        types::{Commitment, PrivateKey, PublicKey, Signature},
+    },
+};
+use tari_crypto::tari_utilities::ByteArray;
+
+use crate::tari_rpc as grpc;
+use tari_core::transactions::transaction::Transaction;
+
+impl TryFrom<grpc::TransactionOutput> for TransactionOutput {
+    type Error = String;
+
+    fn try_from(output: grpc::TransactionOutput) -> Result<Self, Self::Error> {
+        let features = output
+            .features
+            .map(TryInto::try_into)
+            .ok_or_else(|| "transaction output features not provided".to_string())??;
+
+        let commitment = Commitment::from_bytes(&output.commitment).map_err(|err| err.to_string())?;
+        Ok(Self {
+            features,
+            commitment,
+            proof: BulletRangeProof(output.range_proof),
+        })
+    }
+}

@@ -20,6 +20,23 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub mod blocks;
-pub mod helpers;
-pub mod base_node_grpc_server;
+use crate::tari_rpc as grpc;
+use prost_types::Timestamp;
+use std::convert::{TryFrom, TryInto};
+use tari_core::{
+    blocks::{Block, BlockHeader, NewBlockHeaderTemplate, NewBlockTemplate},
+    chain_storage::HistoricalBlock,
+    proof_of_work::{Difficulty, PowAlgorithm, ProofOfWork},
+    transactions::types::BlindingFactor,
+};
+use tari_crypto::tari_utilities::{epoch_time::EpochTime, ByteArray, Hashable};
+
+impl From<HistoricalBlock> for grpc::HistoricalBlock {
+    fn from(hb: HistoricalBlock) -> Self {
+        Self {
+            confirmations: hb.confirmations,
+            spent_commitments: hb.spent_commitments.iter().map(|c| Vec::from(c.as_bytes())).collect(),
+            block: Some(hb.block.into()),
+        }
+    }
+}

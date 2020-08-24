@@ -20,6 +20,39 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub mod blocks;
-pub mod helpers;
-pub mod base_node_grpc_server;
+use crate::tari_rpc as grpc;
+use prost_types::Timestamp;
+use std::convert::{TryFrom, TryInto};
+use tari_core::{
+    blocks::{Block, BlockHeader, NewBlockHeaderTemplate, NewBlockTemplate},
+    chain_storage::HistoricalBlock,
+    proof_of_work::{Difficulty, PowAlgorithm, ProofOfWork},
+    transactions::types::BlindingFactor,
+};
+use tari_crypto::tari_utilities::{epoch_time::EpochTime, ByteArray, Hashable};
+impl From<tari_core::blocks::Block> for grpc::Block {
+    fn from(block: Block) -> Self {
+        Self {
+            body: Some(block.body.into()),
+            header: Some(block.header.into()),
+        }
+    }
+}
+
+impl TryFrom<grpc::Block> for Block {
+    type Error = String;
+
+    fn try_from(block: grpc::Block) -> Result<Self, Self::Error> {
+        let header = block
+            .header
+            .map(TryInto::try_into)
+            .ok_or_else(|| "Block header not provided".to_string())??;
+
+        let body = block
+            .body
+            .map(TryInto::try_into)
+            .ok_or_else(|| "Block body not provided".to_string())??;
+
+        Ok(Self { header, body })
+    }
+}

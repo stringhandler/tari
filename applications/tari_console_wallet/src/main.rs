@@ -5,7 +5,6 @@ use crate::{
         events::{Event, EventStream},
     },
 };
-
 use log::*;
 use std::{
     io::{stdout, Write},
@@ -22,7 +21,6 @@ use tari_app_utilities::utilities::{
 };
 use tari_common::{ConfigBootstrap, GlobalConfig, Network};
 use tari_core::{consensus::Network as NetworkType, transactions::types::CryptoFactories};
-
 use std::io::Stdout;
 use tari_app_utilities::identity_management::setup_node_identity;
 use tari_common::configuration::bootstrap::ApplicationType;
@@ -43,6 +41,10 @@ use tokio::{
     sync::RwLock,
 };
 use tui::{backend::CrosstermBackend, Terminal};
+use tonic::transport::Server;
+use std::net::SocketAddr;
+use crate::grpc::WalletGrpcServer;
+
 
 #[macro_use]
 extern crate lazy_static;
@@ -54,6 +56,7 @@ const BASE_NODE_BUFFER_MIN_SIZE: usize = 30;
 mod dummy_data;
 mod ui;
 mod utils;
+mod grpc;
 
 /// Application entry point
 fn main() {
@@ -123,7 +126,10 @@ fn main_inner() -> Result<(), ExitCodes> {
 
     let node_identity = wallet.comms.node_identity().as_ref().clone();
     let wallet = Arc::new(RwLock::new(wallet));
+    let grpc =  crate::grpc::WalletGrpcServer::new(wallet.clone());
+
     if !bootstrap.daemon_mode {
+        handle.spawn(run_grpc(grpc, node_config.grpc_address));
         let mut app = App::<CrosstermBackend<Stdout>>::new(
             "Tari Console Wallet".into(),
             &node_identity,
@@ -139,6 +145,9 @@ fn main_inner() -> Result<(), ExitCodes> {
         // TODO: Shutdown wallet
         Ok(())
     } else {
+        println!("Starting grpc server");
+        handle.block_on(run_grpc(grpc, node_config.grpc_address)).map_err(|err| ExitCodes::GrpcError(err))?;
+        println!("Shutting down");
         Ok(())
     }
 }
@@ -230,8 +239,11 @@ fn setup_wallet(
         }
     })?;
 
+    debug!(target: LOG_TARGET, "Setting peer seeds");
+
     // TODO update this to come from an explicit config field. This will be replaced by gRPC interface.
     if !config.peer_seeds.is_empty() {
+
         let seed_peers = parse_peer_seeds(&config.peer_seeds);
         wallet
             .set_base_node_peer(
@@ -246,4 +258,18 @@ fn setup_wallet(
     }
 
     Ok(wallet)
+}
+
+async fn run_grpc(grpc: WalletGrpcServer, grpc_address: SocketAddr) -> Result<(), String> {
+    info!(target: LOG_TARGET, "Starting GRPC on {}", grpc_address);
+
+    Server::builder()
+        .add_service(tari_app_grpc::tari_rpc::wallet_server::WalletServer::new(
+            grpc,
+        ))
+        .serve(grpc_address)
+        .await
+        .map_err(|e| format!("GRPC server returned error:{}", e))?;
+    info!(target: LOG_TARGET, "Stopping GRPC");
+    Ok(())
 }

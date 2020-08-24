@@ -12,6 +12,7 @@ tari_app_utilities = { version = "^0.1.0", path = "../tari_app_utilities"}
 tari_comms = { version = "^0.2", path = "../../comms"}
 tari_comms_dht = { version = "^0.2", path = "../../comms/dht"}
 tari_p2p = { version= "^0.2", path = "../../base_layer/p2p" }
+tari_app_grpc = {  path = "../tari_app_grpc" }
 
 chrono = { version = "0.4.6", features = ["serde"]}
 crossterm = { version = "0.17"}
@@ -26,6 +27,7 @@ qrcode = { version = "0.12" }
 dirs = "2.0.2"
 tokio = { version="0.2.10", features = ["signal"] }
 thiserror = "1.0.20"
+tonic = "0.2"
 
 [dependencies.tari_core]
 path = "../../base_layer/core"

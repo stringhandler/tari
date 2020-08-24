@@ -20,6 +20,27 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub mod blocks;
-pub mod helpers;
-pub mod base_node_grpc_server;
+use crate::tari_rpc as grpc;
+use prost_types::Timestamp;
+use std::convert::{TryFrom, TryInto};
+use tari_core::{
+    blocks::{Block, BlockHeader, NewBlockHeaderTemplate, NewBlockTemplate},
+    chain_storage::HistoricalBlock,
+    proof_of_work::{Difficulty, PowAlgorithm, ProofOfWork},
+    transactions::types::BlindingFactor,
+};
+use tari_crypto::tari_utilities::{epoch_time::EpochTime, ByteArray, Hashable};
+
+impl TryFrom<grpc::ProofOfWork> for ProofOfWork {
+    type Error = String;
+
+    fn try_from(pow: grpc::ProofOfWork) -> Result<Self, Self::Error> {
+        Ok(Self {
+            pow_algo: PowAlgorithm::try_from(pow.pow_algo)?,
+            accumulated_monero_difficulty: Difficulty::from(pow.accumulated_monero_difficulty),
+            accumulated_blake_difficulty: Difficulty::from(pow.accumulated_blake_difficulty),
+            target_difficulty: Difficulty::from(pow.target_difficulty),
+            pow_data: pow.pow_data,
+        })
+    }
+}

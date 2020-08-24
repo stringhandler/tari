@@ -47,7 +47,7 @@
 ///
 /// For the first run
 /// ```cargo run tari_base_node -- --create-id```
-/// 
+///
 /// Subsequent runs
 /// ```cargo run tari_base_node```
 ///
@@ -192,7 +192,7 @@ fn main_inner() -> Result<(), ExitCodes> {
     cli::print_banner(parser.get_commands(), 3);
     if node_config.grpc_enabled {
         let grpc =
-            crate::grpc::server::BaseNodeGrpcServer::new(rt.handle().clone(), ctx.local_node(), node_config.clone());
+            crate::grpc::base_node_grpc_server::BaseNodeGrpcServer::new(rt.handle().clone(), ctx.local_node(), node_config.clone());
 
         rt.spawn(run_grpc(grpc, node_config.grpc_address));
     }
@@ -215,11 +215,11 @@ fn main_inner() -> Result<(), ExitCodes> {
 }
 
 /// Runs the gRPC server
-async fn run_grpc(grpc: crate::grpc::server::BaseNodeGrpcServer, grpc_address: SocketAddr) -> Result<(), String> {
+async fn run_grpc(grpc: crate::grpc::base_node_grpc_server::BaseNodeGrpcServer, grpc_address: SocketAddr) -> Result<(), String> {
     info!(target: LOG_TARGET, "Starting GRPC on {}", grpc_address);
 
     Server::builder()
-        .add_service(tari_app_grpc::base_node_grpc::base_node_server::BaseNodeServer::new(
+        .add_service(tari_app_grpc::tari_rpc::base_node_server::BaseNodeServer::new(
             grpc,
         ))
         .serve(grpc_address)

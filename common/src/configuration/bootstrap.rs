@@ -51,7 +51,7 @@ use super::{
     error::ConfigError,
     utils::{install_default_config_file, load_configuration},
 };
-use crate::{dir_utils, initialize_logging, logging, DEFAULT_CONFIG, DEFAULT_LOG_CONFIG, DEFAULT_WALLET_LOG_CONFIG};
+use crate::{dir_utils, initialize_logging, logging, DEFAULT_CONFIG, DEFAULT_LOG_CONFIG, DEFAULT_WALLET_LOG_CONFIG, DEFAULT_MERGE_MINING_PROXY_LOG_CONFIG};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -143,6 +143,9 @@ impl ConfigBootstrap {
                 ApplicationType::ConsoleWallet => {
                     self.log_config = dir_utils::default_path(DEFAULT_WALLET_LOG_CONFIG, Some(&self.base_path));
                 },
+                ApplicationType::MergeMiningProxy => {
+                    self.log_config = dir_utils::default_path(DEFAULT_MERGE_MINING_PROXY_LOG_CONFIG, Some(&self.base_path))
+                }
             }
         }
 
@@ -182,6 +185,9 @@ impl ConfigBootstrap {
                     ApplicationType::ConsoleWallet => {
                         install_configuration(&self.log_config, logging::install_default_wallet_logfile_config)
                     },
+                    ApplicationType::MergeMiningProxy => {
+                        install_configuration(&self.log_config, logging::install_default_merge_mining_proxy_logfile_config)
+                    }
                 }
             }
         };
@@ -226,6 +232,7 @@ where F: Fn(&Path) -> Result<(), std::io::Error> {
 pub enum ApplicationType {
     BaseNode,
     ConsoleWallet,
+    MergeMiningProxy
 }
 
 #[cfg(test)]

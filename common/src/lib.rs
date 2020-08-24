@@ -89,5 +89,6 @@ pub use logging::initialize_logging;
 pub const DEFAULT_CONFIG: &str = "config.toml";
 pub const DEFAULT_LOG_CONFIG: &str = "log4rs.yml";
 pub const DEFAULT_WALLET_LOG_CONFIG: &str = "log4rs_wallet.yml";
+pub const DEFAULT_MERGE_MINING_PROXY_LOG_CONFIG: &str = "log4rs.yml";
 
 pub(crate) const LOG_TARGET: &str = "common::config";
