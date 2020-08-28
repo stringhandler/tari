@@ -151,6 +151,7 @@ impl From<NewBlockTemplate> for grpc::NewBlockTemplate {
             }),
         };
         Self {
+            is_trusted: block.is_trusted,
             body: Some(grpc::AggregateBody {
                 inputs: block
                     .body
@@ -272,7 +273,7 @@ impl TryFrom<grpc::NewBlockTemplate> for NewBlockTemplate {
             .map(TryInto::try_into)
             .ok_or_else(|| "Block body not provided".to_string())??;
 
-        Ok(Self { header, body })
+        Ok(Self { header, body, is_trusted : block.is_trusted })
     }
 }
 

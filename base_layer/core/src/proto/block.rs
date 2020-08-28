@@ -200,7 +200,7 @@ impl TryFrom<proto::NewBlockTemplate> for NewBlockTemplate {
             .map(TryInto::try_into)
             .ok_or_else(|| "Block body not provided".to_string())??;
 
-        Ok(Self { header, body })
+        Ok(Self { header, body, is_trusted: block_template.is_trusted})
     }
 }
 

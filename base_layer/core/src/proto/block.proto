@@ -89,4 +89,5 @@ message NewBlockHeaderTemplate {
 message NewBlockTemplate {
     NewBlockHeaderTemplate header = 1;
     tari.types.AggregateBody body = 2;
+    bool is_trusted = 3;
 }

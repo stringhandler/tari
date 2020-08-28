@@ -112,6 +112,7 @@ message NewBlockHeaderTemplate {
 message NewBlockTemplate {
     NewBlockHeaderTemplate header = 1;
     AggregateBody body = 2;
+    bool is_trusted = 3;
 }
 
 // The transaction kernel tracks the excess for a given transaction. For an explanation of what the excess is, and

@@ -1055,7 +1055,7 @@ pub fn calculate_mmr_roots<T: BlockchainBackend>(
     template: NewBlockTemplate,
 ) -> Result<Block, ChainStorageError>
 {
-    let NewBlockTemplate { header, mut body } = template;
+    let NewBlockTemplate { header, mut body, is_trusted } = template;
     // Make sure the body components are sorted. If they already are, this is a very cheap call.
     body.sort();
     let kernel_hashes: Vec<HashOutput> = body.kernels().iter().map(|k| k.hash()).collect();

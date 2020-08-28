@@ -33,6 +33,9 @@ use std::fmt::{Display, Formatter};
 pub struct NewBlockTemplate {
     pub header: NewBlockHeaderTemplate,
     pub body: AggregateBody,
+    // A flag to say whether the base node that provided it was at the tip.
+    // Should possibly be moved into a different structure
+    pub is_trusted: bool
 }
 
 impl From<Block> for NewBlockTemplate {
@@ -41,6 +44,7 @@ impl From<Block> for NewBlockTemplate {
         Self {
             header: header.into(),
             body,
+            is_trusted: false
         }
     }
 }
