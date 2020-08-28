@@ -366,12 +366,6 @@ where B: BlockchainBackend
         db.fetch_chain_metadata()
     }
 
-    /// Sets and stores the chain metadata, overwriting previous metadata.
-    pub fn set_chain_metadata(&self, metadata: ChainMetadata) -> Result<(), ChainStorageError> {
-        let mut db = self.db_write_access()?;
-        set_chain_metadata(&mut db, metadata)
-    }
-
     /// Returns the transaction kernel with the given hash.
     pub fn fetch_kernel(&self, hash: HashOutput) -> Result<TransactionKernel, ChainStorageError> {
         let db = self.db_read_access()?;
@@ -934,23 +928,23 @@ fn unexpected_result<T>(req: DbKey, res: DbValue) -> Result<T, ChainStorageError
     Err(ChainStorageError::UnexpectedResult(msg))
 }
 
-fn set_chain_metadata<T: BlockchainBackend>(
-    db: &mut RwLockWriteGuard<T>,
-    metadata: ChainMetadata,
-) -> Result<(), ChainStorageError>
-{
-    let mut txn = DbTransaction::new();
-    txn.set_metadata(
-        MetadataKey::ChainHeight,
-        MetadataValue::ChainHeight(metadata.height_of_longest_chain),
-    );
-    txn.set_metadata(MetadataKey::BestBlock, MetadataValue::BestBlock(metadata.best_block));
-    txn.set_metadata(
-        MetadataKey::AccumulatedWork,
-        MetadataValue::AccumulatedWork(metadata.accumulated_difficulty),
-    );
-    commit(db, txn)
-}
+// fn set_chain_metadata<T: BlockchainBackend>(
+//     db: &mut RwLockWriteGuard<T>,
+//     metadata: ChainMetadata,
+// ) -> Result<(), ChainStorageError>
+// {
+//     let mut txn = DbTransaction::new();
+//     txn.set_metadata(
+//         MetadataKey::ChainHeight,
+//         MetadataValue::ChainHeight(metadata.height_of_longest_chain),
+//     );
+//     txn.set_metadata(MetadataKey::BestBlock, MetadataValue::BestBlock(metadata.best_block));
+//     txn.set_metadata(
+//         MetadataKey::AccumulatedWork,
+//         MetadataValue::AccumulatedWork(metadata.accumulated_difficulty),
+//     );
+//     commit(db, txn)
+// }
 
 fn fetch_kernel<T: BlockchainBackend>(db: &T, hash: HashOutput) -> Result<TransactionKernel, ChainStorageError> {
     fetch!(db, hash, TransactionKernel)
@@ -1662,7 +1656,7 @@ fn reorganize_chain<T: BlockchainBackend>(
                     .collect::<Vec<_>>(),
             );
             let mut txn = DbTransaction::new();
-            for block in removed_blocks {
+            for block in removed_blocks.into_iter().rev() {
                 txn.delete(DbKey::OrphanBlock(block.hash()));
                 store_new_block(db, block)?;
             }
@@ -1850,8 +1844,7 @@ fn cleanup_orphans<T: BlockchainBackend>(
         db.for_each_orphan(|pair| {
             let (block_hash, block) = pair.unwrap();
             orphans.push((block.header.height, block_hash));
-        })
-        .expect("Unexpected result for database query");
+        })?;
         orphans.sort_by(|a, b| a.0.cmp(&b.0));
 
         let metadata = db.fetch_chain_metadata()?;
@@ -1861,7 +1854,7 @@ fn cleanup_orphans<T: BlockchainBackend>(
             if height > horizon_height && removed_count >= num_over_limit {
                 break;
             }
-            debug!(
+            info!(
                 target: LOG_TARGET,
                 "Discarding orphan block #{} ({}).",
                 height,

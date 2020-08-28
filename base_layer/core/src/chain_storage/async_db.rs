@@ -89,7 +89,7 @@ macro_rules! make_async {
 
 //---------------------------------- Metadata --------------------------------------------//
 make_async!(get_chain_metadata() -> ChainMetadata, "get_chain_metadata");
-make_async!(set_chain_metadata(metadata: ChainMetadata) -> (), "set_chain_metadata");
+// make_async!(set_chain_metadata(metadata: ChainMetadata) -> (), "set_chain_metadata");
 
 //---------------------------------- Kernels --------------------------------------------//
 make_async!(fetch_kernel(hash: HashOutput) -> TransactionKernel, "fetch_kernel");

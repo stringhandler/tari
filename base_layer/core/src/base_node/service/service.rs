@@ -63,6 +63,7 @@ use tari_crypto::tari_utilities::hex::Hex;
 use tari_p2p::{domain_message::DomainMessage, tari_message::TariMessageType};
 use tari_service_framework::RequestContext;
 use tokio::task;
+use crate::chain_storage::BlockAddResult;
 
 const LOG_TARGET: &str = "c::bn::base_node_service::service";
 

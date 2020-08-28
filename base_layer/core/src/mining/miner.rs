@@ -234,7 +234,6 @@ impl Miner {
                 break;
             }
         }
-        trace!("returning closing thread");
         Ok(self)
     }
 
@@ -275,10 +274,10 @@ impl Miner {
             if !mining_enabled_by_user.load(Ordering::Relaxed) {
                 spawn_mining_task = false;
             }
-            #[allow(clippy::match_bool)]
-            let mining_future = match spawn_mining_task {
-                true => task::spawn(self.mining()),
-                false => task::spawn(self.not_mining()),
+            let mining_future = if spawn_mining_task {
+                task::spawn(self.mining()) }
+            else {
+                task::spawn(self.not_mining())
             };
             // This flag will let the future select loop again if the miner has not been issued a shutdown command.
             let mut wait_for_mining_event = true;
@@ -300,7 +299,7 @@ impl Miner {
                             BlocksSynchronized | NetworkSilence => {
                                 info!(target: LOG_TARGET,
                                 "Our chain has synchronised with the network, or is a seed node. Starting miner");
-                                stop_mining_flag.store(true, Ordering::Relaxed);
+                                stop_mining_flag.store(false, Ordering::Relaxed);
                                 spawn_mining_task = true;
                                 wait_for_mining_event = false;
                             },
@@ -415,7 +414,7 @@ impl Miner {
         info!(target: LOG_TARGET, "Mined a block: {}", block);
         match self.node_interface.submit_block(block, Broadcast::from(true)).await {
             Ok(_) => {
-                trace!("Miner successfully submitted block");
+                info!(target: LOG_TARGET, "Miner successfully submitted block");
                 Ok(())
             },
             Err(CommsInterfaceError::ChainStorageError(e)) => {

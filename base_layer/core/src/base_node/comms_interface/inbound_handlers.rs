@@ -480,7 +480,7 @@ where T: BlockchainBackend + 'static
         // Create block event on block event stream
         match add_block_result {
             Ok(block_add_result) => {
-                trace!(target: LOG_TARGET, "Block event created: {}", block_add_result);
+                info!(target: LOG_TARGET, "Block result for adding to DB: {}", block_add_result);
 
                 let should_propagate = match &block_add_result {
                     BlockAddResult::Ok => true,
