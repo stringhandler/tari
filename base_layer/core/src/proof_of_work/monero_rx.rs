@@ -148,7 +148,7 @@ impl MoneroData {
 pub fn monero_difficulty(header: &BlockHeader) -> Difficulty {
     match monero_difficulty_calculation(header) {
         Ok(v) => v,
-        Err(_) => 0.into(),
+        Err(_) => 1.into(),
     }
 }
 
