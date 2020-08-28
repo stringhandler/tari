@@ -80,7 +80,7 @@ use tari_core::{
         MempoolSyncProtocolExtension,
         MempoolValidators,
     },
-    mining::{Miner, MinerInstruction},
+    mining::Miner,
     tari_utilities::{hex::Hex, message_format::MessageFormat},
     transactions::{
         crypto::keys::SecretKey as SK,
@@ -120,13 +120,7 @@ use tari_wallet::{
         TransactionServiceInitializer,
     },
 };
-use tokio::{
-    runtime,
-    stream::StreamExt,
-    sync::{broadcast, broadcast::Sender as syncSender},
-    task,
-    time::delay_for,
-};
+use tokio::{runtime, stream::StreamExt, sync::broadcast, task, time::delay_for};
 
 const LOG_TARGET: &str = "c::bn::initialization";
 /// The minimum buffer size for the base node pubsub_connector channel
@@ -206,19 +200,9 @@ impl NodeContainer {
         using_backend!(self, ctx, ctx.miner_enabled.clone())
     }
 
-    /// Returns this node's mining status.
-    pub fn mining_status(&self) -> Arc<AtomicBool> {
-        using_backend!(self, ctx, ctx.mining_status.clone())
-    }
-
     /// Returns this node's miner atomic hash rate.
     pub fn miner_hashrate(&self) -> Arc<AtomicU64> {
         using_backend!(self, ctx, ctx.miner_hashrate.clone())
-    }
-
-    /// Returns this node's miner instruction event channel.
-    pub fn miner_instruction_events(&self) -> syncSender<MinerInstruction> {
-        using_backend!(self, ctx, ctx.miner_instruction_events.clone())
     }
 
     /// Returns a handle to the wallet transaction service. This function panics if it has not been registered
@@ -285,8 +269,6 @@ pub struct BaseNodeContext<B: BlockchainBackend> {
     node: BaseNodeStateMachine<B>,
     miner: Option<Miner>,
     miner_enabled: Arc<AtomicBool>,
-    mining_status: Arc<AtomicBool>,
-    miner_instruction_events: syncSender<MinerInstruction>,
     pub miner_hashrate: Arc<AtomicU64>,
 }
 
@@ -684,9 +666,7 @@ where
     };
 
     let miner_enabled = miner.enable_mining_flag();
-    let mining_status = miner.mining_status_flag();
     let miner_hashrate = miner.get_hashrate_u64();
-    let miner_instruction_events = miner.get_miner_instruction_events_sender_channel();
     Ok(BaseNodeContext {
         base_node_comms,
         base_node_dht,
@@ -696,8 +676,6 @@ where
         node,
         miner: Some(miner),
         miner_enabled,
-        mining_status,
-        miner_instruction_events,
         miner_hashrate,
     })
 }
