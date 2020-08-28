@@ -42,8 +42,8 @@ pub enum MergeMineError {
     SerializeError(String),
     #[error("Error deserializing Monero data")]
     DeserializeError,
-    #[error("Hashing of Monero data failed")]
-    HashingError,
+    #[error("Hashing of Monero data failed: {0}")]
+    HashingError(String),
     #[error("RandomX error: {0}")]
     RandomXError(#[from] RandomXError),
     #[error("Validation error: {0}")]
@@ -71,35 +71,49 @@ pub struct MoneroData {
 
 // Hash algorithm in monero
 pub fn cn_fast_hash(data: &[u8]) -> Vec<u8> {
-    Hash::hash(data).0.as_bytes().to_vec()
+    Hash::hash(data).0.to_vec()
 }
 
 // Tree hash count in monero
-fn tree_hash_cnt(count: usize) -> usize {
-    assert!(count >= 3);
-    assert!(count <= 0x10000000);
+fn tree_hash_cnt(count: usize) -> Result<usize, MergeMineError> {
+    if count < 3 {
+        return Err(MergeMineError::HashingError(
+            "Cannot calculate Monero root, algorithm path error".to_string(),
+        ));
+    }
+
+    if count > 0x10000000 {
+        return Err(MergeMineError::HashingError(
+            "Cannot calculate Monero root, hash count too large".to_string(),
+        ));
+    }
 
     let mut pow: usize = 2;
     while pow < count {
         pow <<= 1;
     }
-    pow >> 1
+    Ok(pow >> 1)
 }
 
 /// Tree hash algorithm in monero
 #[allow(clippy::needless_range_loop)]
-pub fn tree_hash(hashes: Vec<Hash>) -> Vec<u8> {
-    assert!(!hashes.is_empty());
+pub fn tree_hash(hashes: Vec<Hash>) -> Result<Vec<u8>, MergeMineError> {
+    if hashes.is_empty() {
+        return Err(MergeMineError::HashingError(
+            "Cannot calculate Monero root, hashes is empty".to_string(),
+        ));
+    }
+
     match hashes.len() {
-        1 => hashes[0].0.to_vec(),
+        1 => Ok(hashes[0].0.to_vec()),
         2 => {
             let mut buf: [u8; 64] = [0; 64];
             buf[..32].copy_from_slice(&hashes[0].0.to_vec());
             buf[32..].copy_from_slice(&hashes[1].0.to_vec());
-            cn_fast_hash(&buf)
+            Ok(cn_fast_hash(&buf))
         },
         _ => {
-            let mut cnt = tree_hash_cnt(hashes.len());
+            let mut cnt = tree_hash_cnt(hashes.len())?;
             let mut buf: Vec<u8> = Vec::with_capacity(cnt * 32);
 
             for i in 0..(2 * cnt - hashes.len()) {
@@ -121,7 +135,12 @@ pub fn tree_hash(hashes: Vec<Hash>) -> Vec<u8> {
                 buf[(j * 32)..((j + 1) * 32)].copy_from_slice(tmp.as_slice());
                 i += 2;
             }
-            assert_eq!(i, hashes.len());
+
+            if !(i == hashes.len()) {
+                return Err(MergeMineError::HashingError(
+                    "Cannot calculate Monero root, hashes not equal to count".to_string(),
+                ));
+            }
 
             while cnt > 2 {
                 cnt >>= 1;
@@ -133,7 +152,7 @@ pub fn tree_hash(hashes: Vec<Hash>) -> Vec<u8> {
                 }
             }
 
-            cn_fast_hash(&buf[..64])
+            Ok(cn_fast_hash(&buf[..64]))
         },
     }
 }
@@ -163,10 +182,9 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
 }
 
 /// Appends merge mining hash to a Monero block and returns the Monero blocktemplate_blob
-pub fn append_merge_mining_tag(block: &MoneroBlock, hash: Hash) -> Result<String, MergeMineError> {
-    let mut monero_block = block.clone();
+pub fn append_merge_mining_tag(block: &mut MoneroBlock, hash: Hash) -> Result<String, MergeMineError> {
     let mm_tag = SubField::MergeMining(VarInt(0), hash);
-    monero_block.miner_tx.prefix.extra.0.push(mm_tag);
+    block.miner_tx.prefix.extra.0.push(mm_tag);
     let serialized = serialize::<MoneroBlock>(&block);
     Ok(hex::encode(&serialized).into())
 }
@@ -183,9 +201,9 @@ pub fn create_input_blob(
     let mut count = serialize::<VarInt>(&VarInt(tx_count.clone() as u64));
     let mut hashes = Vec::new();
     for item in tx_hashes {
-        hashes.push(Hash(from_slice(item.clone().as_bytes())));
+        hashes.push(Hash::from(item.clone()));
     }
-    let mut root = tree_hash(hashes);
+    let mut root = tree_hash(hashes)?;
     let mut encode = header;
     encode.append(&mut root);
     encode.append(&mut count);
@@ -212,9 +230,9 @@ pub fn from_hashes(hashes: &[Hash]) -> Vec<[u8; 32]> {
 fn verify_root(monero_data: &MoneroData) -> Result<(), MergeMineError> {
     let mut hashes = Vec::new();
     for item in &monero_data.transaction_hashes {
-        hashes.push(Hash(from_slice(item.to_vec().as_slice())));
+        hashes.push(Hash::from(item));
     }
-    let root = tree_hash(hashes);
+    let root = tree_hash(hashes)?;
 
     if !(monero_data.transaction_root.to_vec() == root) {
         return Err(MergeMineError::ValidationError(
@@ -224,25 +242,23 @@ fn verify_root(monero_data: &MoneroData) -> Result<(), MergeMineError> {
     Ok(())
 }
 
-fn merged_mining_subfield(header: &BlockHeader) -> SubField {
-    let hash = header.merged_mining_hash();
-    let depth = 0;
-    SubField::MergeMining(VarInt(depth), Hash::hash(&hash[..32]))
-}
-
 fn verify_header(header: &BlockHeader, monero_data: &MoneroData) -> Result<(), MergeMineError> {
-    if !(monero_data
-        .coinbase_tx
-        .prefix
-        .extra
-        .0
-        .contains(&merged_mining_subfield(header)))
-    {
+    let expected_merge_mining_hash = Hash::from(from_slice(&header.merged_mining_hash()));
+
+    let is_found = monero_data.coinbase_tx.prefix.extra.0.iter().any(|item| match item {
+        SubField::MergeMining(depth, merge_mining_hash) => {
+            depth == &VarInt(0) && merge_mining_hash == &expected_merge_mining_hash
+        },
+        _ => false,
+    });
+
+    if !is_found {
         return Err(MergeMineError::ValidationError(
-            "Merge mining tag was not found in Monero coinbase transaction".to_string(),
+            "Expected merge mining tag was not found in Monero coinbase transaction".to_string(),
         ));
     }
     verify_root(monero_data)?;
+
     // TODO: add seed check here.
     Ok(())
 }
