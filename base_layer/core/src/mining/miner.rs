@@ -28,7 +28,7 @@ use crate::{
     blocks::{Block, BlockHeader, NewBlockTemplate},
     consensus::ConsensusManager,
     mempool::MempoolStateEvent,
-    mining::{blake_miner::CpuBlakePow, error::MinerError, MinerInstruction},
+    mining::{blake_miner::CpuBlakePow, error::MinerError},
     proof_of_work::PowAlgorithm,
     transactions::{
         transaction::UnblindedOutput,
@@ -40,7 +40,7 @@ use core::sync::atomic::{AtomicBool, AtomicU64};
 use futures::{
     channel::{
         mpsc,
-        mpsc::{Receiver as mpscReceiver, Sender as mpscSender},
+        mpsc::{Receiver, Sender},
     },
     pin_mut,
     StreamExt,
@@ -51,14 +51,7 @@ use std::sync::{atomic::Ordering, Arc};
 use tari_broadcast_channel::Subscriber;
 use tari_crypto::keys::SecretKey;
 use tari_shutdown::ShutdownSignal;
-use tokio::{
-    sync::{
-        broadcast,
-        broadcast::{Receiver as syncReceiver, Sender as syncSender},
-    },
-    task,
-    task::spawn_blocking,
-};
+use tokio::{task, task::spawn_blocking};
 
 pub const LOG_TARGET: &str = "c::m::miner";
 
@@ -67,13 +60,11 @@ pub struct Miner {
     stop_mining_flag: Arc<AtomicBool>,
     consensus: ConsensusManager,
     node_interface: LocalNodeCommsInterface,
-    utxo_sender: mpscSender<UnblindedOutput>,
+    utxo_sender: Sender<UnblindedOutput>,
     node_state_event_rx: Option<Subscriber<StateEvent>>,
     mempool_state_event_rx: Option<Subscriber<MempoolStateEvent>>,
-    miner_instruction_events: syncSender<MinerInstruction>,
     threads: usize,
-    mining_enabled_by_user: Arc<AtomicBool>,
-    mining_status: Arc<AtomicBool>,
+    enabled: Arc<AtomicBool>,
     hashrate: Arc<AtomicU64>,
 }
 
@@ -86,9 +77,7 @@ impl Miner {
         threads: usize,
     ) -> Miner
     {
-        let (utxo_sender, _): (mpscSender<UnblindedOutput>, mpscReceiver<UnblindedOutput>) = mpsc::channel(1);
-        let (miner_instruction_events, _): (syncSender<MinerInstruction>, syncReceiver<MinerInstruction>) =
-            broadcast::channel(10);
+        let (utxo_sender, _): (Sender<UnblindedOutput>, Receiver<UnblindedOutput>) = mpsc::channel(1);
         Miner {
             kill_signal,
             consensus,
@@ -97,27 +86,19 @@ impl Miner {
             utxo_sender,
             node_state_event_rx: None,
             mempool_state_event_rx: None,
-            miner_instruction_events,
             threads,
-            mining_enabled_by_user: Arc::new(AtomicBool::new(false)),
-            mining_status: Arc::new(AtomicBool::new(false)),
+            enabled: Arc::new(AtomicBool::new(false)),
             hashrate: Arc::new(AtomicU64::new(0)),
         }
     }
 
     /// This function instantiates a new channel and returns the receiver so that the miner can send out a unblinded
     /// output. This output is only sent if the miner successfully mines a block
-    pub fn get_utxo_receiver_channel(&mut self) -> mpscReceiver<UnblindedOutput> {
+    pub fn get_utxo_receiver_channel(&mut self) -> Receiver<UnblindedOutput> {
         // this should not be too large, as this should not get lost as these are your coinbase utxo's
-        let (sender, receiver): (mpscSender<UnblindedOutput>, mpscReceiver<UnblindedOutput>) = mpsc::channel(20);
+        let (sender, receiver): (Sender<UnblindedOutput>, Receiver<UnblindedOutput>) = mpsc::channel(20);
         self.utxo_sender = sender;
         receiver
-    }
-
-    /// This function returns the sender portion of the mining instruction event channel so that start and
-    /// shutdown events can be sent to the miner while mining
-    pub fn get_miner_instruction_events_sender_channel(&self) -> syncSender<MinerInstruction> {
-        self.miner_instruction_events.clone()
     }
 
     /// This provides a tari_broadcast_channel to the miner so that it can subscribe to the state machine.
@@ -135,12 +116,7 @@ impl Miner {
 
     /// This function returns a arc copy of the atomic bool to start and shutdown the miner.
     pub fn enable_mining_flag(&self) -> Arc<AtomicBool> {
-        self.mining_enabled_by_user.clone()
-    }
-
-    /// This function returns a arc copy of the atomic bool that reflects the mining status.
-    pub fn mining_status_flag(&self) -> Arc<AtomicBool> {
-        self.mining_status.clone()
+        self.enabled.clone()
     }
 
     pub fn get_hashrate_u64(&self) -> Arc<AtomicU64> {
@@ -156,7 +132,7 @@ impl Miner {
     /// Then, if the miner hasn't been stopped, it starts the main mining loop:
     /// 1. We request a new template block from the base node
     /// 2. We add our Coinbase UTXO to the block
-    /// 3. We send this back to the node to calculate the MMR roots
+    /// 3. We send thi sback to the node to calculate the MMR roots
     /// 4. We iterate on the header nonce until
     ///     * the target difficulty is reached
     ///     * or the loop is interrupted because a new block was found in the interim, or the miner is stopped
@@ -186,11 +162,9 @@ impl Miner {
             error!(target: LOG_TARGET, "Could not get block from basenode {:?}.", block);
             return Ok(self);
         };
-        self.mining_status.store(true, Ordering::Relaxed);
         let mut block = block.unwrap();
         debug!(target: LOG_TARGET, "Miner got new block to mine.");
-        let (tx, mut rx): (mpscSender<Option<BlockHeader>>, mpscReceiver<Option<BlockHeader>>) =
-            mpsc::channel(self.threads);
+        let (tx, mut rx): (Sender<Option<BlockHeader>>, Receiver<Option<BlockHeader>>) = mpsc::channel(self.threads);
         for _ in 0..self.threads {
             let stop_mining_flag = self.stop_mining_flag.clone();
             let header = block.header.clone();
@@ -234,12 +208,12 @@ impl Miner {
                 break;
             }
         }
+        trace!("returning closing thread");
         Ok(self)
     }
 
     // This is just a helper function to get around the rust borrow checker
     async fn not_mining(self) -> Result<Miner, MinerError> {
-        self.mining_status.store(false, Ordering::Relaxed);
         Ok(self)
     }
 
@@ -248,97 +222,70 @@ impl Miner {
     pub async fn mine(mut self) {
         // This flag is used to stop the mining;
         let stop_mining_flag = self.stop_mining_flag.clone();
-        let mining_enabled_by_user = self.mining_enabled_by_user.clone();
         let mempool_state_event = self
             .mempool_state_event_rx
             .take()
             .expect("Miner does not have access to the mempool state event stream")
             .fuse();
-        let blockchain_event = self
+        let state_event = self
             .node_state_event_rx
             .take()
             .expect("Miner does not have access to state event stream")
             .fuse();
-        let mining_instruction_event = self.miner_instruction_events.subscribe().fuse();
         let mut kill_signal = self.kill_signal.clone();
 
         pin_mut!(mempool_state_event);
-        pin_mut!(blockchain_event);
-        pin_mut!(mining_instruction_event);
-
+        pin_mut!(state_event);
         // Start mining immediately in case we're the only node on the network and we never receive a BlockSync event
-        let mut spawn_mining_task = true;
+        let mut start_mining = true;
         trace!("starting mining thread");
         'main: loop {
             stop_mining_flag.store(false, Ordering::Relaxed); // ensure we can mine if we need to
-            if !mining_enabled_by_user.load(Ordering::Relaxed) {
-                spawn_mining_task = false;
+            if !self.enabled.load(Ordering::Relaxed) {
+                start_mining = false;
             }
-            let mining_future = if spawn_mining_task {
-                task::spawn(self.mining()) }
-            else {
-                task::spawn(self.not_mining())
+            #[allow(clippy::match_bool)]
+            let mining_future = match start_mining {
+                true => task::spawn(self.mining()),
+                false => task::spawn(self.not_mining()),
             };
             // This flag will let the future select loop again if the miner has not been issued a shutdown command.
-            let mut wait_for_mining_event = true;
-            while wait_for_mining_event {
+            let mut wait_for_miner = false;
+            while !wait_for_miner {
                 futures::select! {
-                    mempool_event = mempool_state_event.select_next_some() => {
-                        match *mempool_event {
-                            MempoolStateEvent::Updated => {
-                                stop_mining_flag.store(true, Ordering::Relaxed);
-                                spawn_mining_task = true;
-                                wait_for_mining_event = false;
-                            },
-                            _ => (),
-                        }
-                    },
-                    blockchain_event = blockchain_event.select_next_some() => {
-                        use StateEvent::*;
-                        match *blockchain_event {
-                            BlocksSynchronized | NetworkSilence => {
-                                info!(target: LOG_TARGET,
-                                "Our chain has synchronised with the network, or is a seed node. Starting miner");
-                                stop_mining_flag.store(false, Ordering::Relaxed);
-                                spawn_mining_task = true;
-                                wait_for_mining_event = false;
-                            },
-                            FallenBehind(SyncStatus::Lagging(_, _)) => {
-                                info!(target: LOG_TARGET, "Our chain has fallen behind the network. Pausing miner");
-                                stop_mining_flag.store(true, Ordering::Relaxed);
-                                spawn_mining_task = false;
-                                wait_for_mining_event = false;
-                            },
-                            _ => {
-                                stop_mining_flag.store(true, Ordering::Relaxed);
-                                wait_for_mining_event = false;
-                            },
-                        }
-                    },
-                    instruction = mining_instruction_event.select_next_some() => {
-                        use MinerInstruction::*;
-                        match instruction.unwrap_or_else(|_| (IgnoreInstruction)) {
-                            PauseMining => {
-                                info!(target: LOG_TARGET, "Mining pause event received from the CLI");
-                                stop_mining_flag.store(true, Ordering::Relaxed);
-                                mining_enabled_by_user.store(false, Ordering::Relaxed);
-                                spawn_mining_task = false;
-                                wait_for_mining_event = false;
-                            },
-                            StartMining => {
-                                info!(target: LOG_TARGET, "Mining start event received from the CLI");
-                                mining_enabled_by_user.store(true, Ordering::Relaxed);
-                                spawn_mining_task = true;
-                                wait_for_mining_event = false;
-                            },
-                            _ => (),
-                        }
-                    },
-                    _ = kill_signal => {
-                        info!(target: LOG_TARGET, "Mining kill signal received! Miner is shutting down");
-                        stop_mining_flag.store(true, Ordering::Relaxed);
-                        break 'main;
+                msg = mempool_state_event.select_next_some() => {
+                    match *msg {
+                        MempoolStateEvent::Updated => {
+                            stop_mining_flag.store(true, Ordering::Relaxed);
+                            start_mining = true;
+                            wait_for_miner = true;
+                        },
+                        _ => (),
                     }
+                },
+                event = state_event.select_next_some() => {
+                    use StateEvent::*;
+                    stop_mining_flag.store(true, Ordering::Relaxed);
+                    match *event {
+                        BlocksSynchronized | NetworkSilence => {
+                            info!(target: LOG_TARGET,
+                            "Our chain has synchronised with the network, or is a seed node. Starting miner");
+                            start_mining = true;
+                            wait_for_miner = true;
+                        },
+                        FallenBehind(SyncStatus::Lagging(_, _)) => {
+                            info!(target: LOG_TARGET, "Our chain has fallen behind the network. Pausing miner");
+                            start_mining = false;
+                            wait_for_miner = true;
+                        },
+                        _ => {wait_for_miner = true;},
+                    }
+                },
+                _ = kill_signal => {
+                    info!(target: LOG_TARGET, "Mining kill signal received! Miner is shutting down");
+                    stop_mining_flag.store(true, Ordering::Relaxed);
+                    break 'main;
+                }
                 };
             }
             self = mining_future.await.expect("Miner crashed").expect("Miner crashed");
@@ -414,7 +361,7 @@ impl Miner {
         info!(target: LOG_TARGET, "Mined a block: {}", block);
         match self.node_interface.submit_block(block, Broadcast::from(true)).await {
             Ok(_) => {
-                info!(target: LOG_TARGET, "Miner successfully submitted block");
+                trace!("Miner successfully submitted block");
                 Ok(())
             },
             Err(CommsInterfaceError::ChainStorageError(e)) => {
