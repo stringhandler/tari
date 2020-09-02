@@ -31,13 +31,19 @@ use crate::{
         Block,
     },
     chain_storage::ChainStorageError,
-    consensus::{emission::EmissionSchedule, network::Network, ConsensusConstants},
+    consensus::{
+        chain_strength_comparer::ChainStrengthComparer,
+        emission::EmissionSchedule,
+        network::Network,
+        ConsensusConstants,
+    },
     proof_of_work::DifficultyAdjustmentError,
     transactions::tari_amount::MicroTari,
 };
 use std::sync::Arc;
 use tari_crypto::tari_utilities::hash::Hashable;
 use thiserror::Error;
+use crate::consensus::chain_strength_comparer::strongest_chain;
 
 #[derive(Debug, Error, Clone)]
 pub enum ConsensusManagerError {
@@ -99,6 +105,10 @@ impl ConsensusManager {
         coinbase + block.calculate_fees()
     }
 
+    pub fn chain_strength_comparer(&self) -> &dyn ChainStrengthComparer {
+        self.inner.chain_strength_comparer.as_ref()
+    }
+
     /// This is the currently configured chain network.
     pub fn network(&self) -> Network {
         self.inner.network
@@ -116,16 +126,16 @@ struct ConsensusManagerInner {
     pub emission: EmissionSchedule,
     /// This allows the user to set a custom Genesis block
     pub gen_block: Option<Block>,
+    /// The comparer used to determine which chain is stronger for reorgs.
+    pub chain_strength_comparer: Box<dyn ChainStrengthComparer + Send + Sync>,
 }
 
 /// Constructor for the consensus manager struct
 pub struct ConsensusManagerBuilder {
-    /// This is the inner struct used to control all consensus values.
-    pub consensus_constants: Option<ConsensusConstants>,
-    /// The configured chain network.
-    pub network: Network,
-    /// This allows the user to set a custom Genesis block
-    pub gen_block: Option<Block>,
+    consensus_constants: Option<ConsensusConstants>,
+    network: Network,
+    gen_block: Option<Block>,
+    chain_strength_comparer: Option<Box<dyn ChainStrengthComparer + Send + Sync>>,
 }
 
 impl ConsensusManagerBuilder {
@@ -135,6 +145,7 @@ impl ConsensusManagerBuilder {
             consensus_constants: None,
             network,
             gen_block: None,
+            chain_strength_comparer: None,
         }
     }
 
@@ -150,12 +161,17 @@ impl ConsensusManagerBuilder {
         self
     }
 
+    pub fn on_ties(mut self, chain_strength_comparer: Box<dyn ChainStrengthComparer + Send + Sync>) -> Self {
+        self.chain_strength_comparer = Some(chain_strength_comparer);
+        self
+    }
+
     /// Builds a consensus manager
-    #[allow(clippy::or_fun_call)]
     pub fn build(self) -> ConsensusManager {
+        let network = self.network;
         let consensus_constants = self
             .consensus_constants
-            .unwrap_or(self.network.create_consensus_constants());
+            .unwrap_or_else(|| network.create_consensus_constants());
         let emission = EmissionSchedule::new(
             consensus_constants.emission_initial,
             consensus_constants.emission_decay,
@@ -166,6 +182,17 @@ impl ConsensusManagerBuilder {
             network: self.network,
             emission,
             gen_block: self.gen_block,
+            chain_strength_comparer: self.chain_strength_comparer.unwrap_or(
+                strongest_chain()
+                    .by_accumulated_difficulty()
+                    .then()
+                    .by_monero_difficulty()
+                    .then()
+                    .by_blake_difficulty()
+                    .then()
+                    .by_height()
+                    .build(),
+            ),
         };
         ConsensusManager { inner: Arc::new(inner) }
     }

@@ -65,7 +65,6 @@ use tari_core::{
     tx,
     txn_schema,
     validation::{
-        accum_difficulty_validators::MockAccumDifficultyValidator,
         block_validators::MockStatelessBlockValidator,
         mocks::MockValidator,
         ValidationError,
@@ -594,7 +593,6 @@ fn rewind_past_horizon_height() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -687,6 +685,7 @@ fn handle_tip_reorg() {
 
 #[test]
 fn blockchain_reorgs_to_stronger_chain() {
+    let _ = env_logger::try_init();
     let mut blockchain = TestBlockchain::with_genesis("GB");
     let blocks = blockchain.builder();
     blockchain.add_block(blocks.new_block("A1").child_of("GB").difficulty(1));
@@ -700,9 +699,8 @@ fn blockchain_reorgs_to_stronger_chain() {
     blockchain.add_block(blocks.new_block("B2").child_of("A1").difficulty(1));
     assert_eq!(Some(blockchain.tip()), blockchain.get_block("A4"));
     blockchain.add_block(blocks.new_block("B3").child_of("B2").difficulty(1));
-    assert_eq!(blockchain.chain(), ["GB", "A1", "A2", "A3", "A4"]);
     assert_eq!(Some(blockchain.tip()), blockchain.get_block("A4"));
-
+    assert_eq!(blockchain.chain(), ["GB", "A1", "A2", "A3", "A4"]);
     blockchain.add_block(blocks.new_block("B4").child_of("B3").difficulty(5));
     // Should reorg
     assert_eq!(Some(blockchain.tip()), blockchain.get_block("B4"));
@@ -959,7 +957,6 @@ fn handle_reorg_failure_recovery() {
         let validators = Validators::new(
             block_validator,
             MockValidator::new(true),
-            MockAccumDifficultyValidator {},
         );
         // Create Main Chain
         let network = Network::LocalNet;
@@ -1115,7 +1112,6 @@ fn store_and_retrieve_blocks() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let network = Network::LocalNet;
     let rules = ConsensusManagerBuilder::new(network).build();
@@ -1142,7 +1138,6 @@ fn store_and_retrieve_chain_and_orphan_blocks_with_hashes() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let network = Network::LocalNet;
     let rules = ConsensusManagerBuilder::new(network).build();
@@ -1221,7 +1216,6 @@ fn restore_metadata_and_pruning_horizon_update() {
         let validators = Validators::new(
             MockValidator::new(true),
             MockValidator::new(true),
-            MockAccumDifficultyValidator {},
         );
         let network = Network::LocalNet;
         let block0 = genesis_block::get_rincewind_genesis_block_raw();
@@ -1290,7 +1284,6 @@ fn invalid_block() {
         let validators = Validators::new(
             MockValidator::new(true),
             MockStatelessBlockValidator::new(consensus_manager.clone(), factories.clone()),
-            MockAccumDifficultyValidator {},
         );
         let db = create_lmdb_database(&temp_path, LMDBConfig::default(), MmrCacheConfig::default()).unwrap();
         let mut store =
@@ -1413,7 +1406,6 @@ fn orphan_cleanup_on_block_add() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1464,7 +1456,6 @@ fn horizon_height_orphan_cleanup() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1515,7 +1506,6 @@ fn orphan_cleanup_on_reorg() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1644,7 +1634,6 @@ fn fails_validation() {
     let validators = Validators::new(
         MockValidator::new(false),
         MockValidator::new(true),
-        MockAccumDifficultyValidator,
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1681,7 +1670,6 @@ fn pruned_mode_cleanup_and_fetch_block() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1751,7 +1739,6 @@ fn pruned_mode_is_stxo() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let config = BlockchainDatabaseConfig {
@@ -1942,7 +1929,6 @@ fn pruned_mode_fetch_insert_and_commit() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let config = BlockchainDatabaseConfig {
         orphan_storage_capacity: 3,

@@ -50,7 +50,6 @@ use tari_core::{
         types::{CryptoFactories, HashDigest},
     },
     validation::{
-        accum_difficulty_validators::MockAccumDifficultyValidator,
         mocks::MockValidator,
         transaction_validators::TxInputAndMaturityValidator,
     },
@@ -451,7 +450,6 @@ fn inbound_fetch_blocks_before_horizon_height() {
     let validators = Validators::new(
         MockValidator::new(true),
         MockValidator::new(true),
-        MockAccumDifficultyValidator {},
     );
     let db = MemoryDatabase::<HashDigest>::default();
     let mut config = BlockchainDatabaseConfig::default();

@@ -27,6 +27,7 @@ use crate::helpers::{
     sample_blockchains::create_new_blockchain,
     test_block_builder::{TestBlockBuilder, TestBlockBuilderInner},
 };
+use log::*;
 use rand::{rngs::OsRng, RngCore};
 use serde::private::ser::serialize_tagged_newtype;
 use std::collections::HashMap;
@@ -37,6 +38,8 @@ use tari_core::{
     transactions::types::HashDigest,
 };
 use tari_crypto::tari_utilities::Hashable;
+
+const LOG_TARGET: &str = "tari_core::tests::helpers::test_blockchain";
 
 pub struct TestBlockchain {
     store: BlockchainDatabase<MemoryDatabase<HashDigest>>,
@@ -66,12 +69,13 @@ impl TestBlockchain {
         result
     }
 
-    pub fn add_block(&mut self, block: TestBlockBuilderInner) -> Result<BlockAddResult, ChainStorageError> {
+    pub fn add_block(&mut self, block: TestBlockBuilderInner) -> BlockAddResult {
+        debug!(target: LOG_TARGET, "Adding block '{}' to test block chain", block.name);
         let prev_block = self.blocks.get(&block.child_of.unwrap());
         let prev_block = prev_block.map(|b| &b.block).unwrap();
         let template = chain_block(prev_block, vec![], self.consensus_manager.consensus_constants());
 
-        let mut new_block = self.store.calculate_mmr_roots(template)?;
+        let mut new_block = self.store.calculate_mmr_roots(template).unwrap();
         new_block.header.nonce = OsRng.next_u64();
         find_header_with_achieved_difficulty(&mut new_block.header, block.difficulty.unwrap_or(1).into());
 
@@ -81,7 +85,7 @@ impl TestBlockchain {
             BlockProxy::new(block.name.to_string(), new_block.clone()),
         );
 
-        self.store.add_block(new_block)
+        self.store.add_block(new_block).unwrap()
     }
 
     pub fn builder(&mut self) -> TestBlockBuilder {

@@ -65,7 +65,6 @@ use tari_core::{
     },
     txn_schema,
     validation::{
-        accum_difficulty_validators::MockAccumDifficultyValidator,
         block_validators::StatelessBlockValidator,
         mocks::MockValidator,
     },
@@ -621,7 +620,6 @@ fn propagate_and_forward_invalid_block() {
         .with_block(block0.clone())
         .build();
     let stateless_block_validator = StatelessBlockValidator::new(rules.clone(), factories.clone());
-    let mock_accum_difficulty_validator = MockAccumDifficultyValidator {};
 
     let mock_validator = MockValidator::new(false);
     let (mut dan_node, rules) = BaseNodeBuilder::new(network)
@@ -635,7 +633,6 @@ fn propagate_and_forward_invalid_block() {
         .with_validators(
             mock_validator.clone(),
             stateless_block_validator.clone(),
-            mock_accum_difficulty_validator.clone(),
         )
         .start(&mut runtime, temp_dir.path().join("carol").to_str().unwrap());
     let (mut bob_node, rules) = BaseNodeBuilder::new(network)
@@ -645,7 +642,6 @@ fn propagate_and_forward_invalid_block() {
         .with_validators(
             mock_validator.clone(),
             stateless_block_validator.clone(),
-            mock_accum_difficulty_validator.clone(),
         )
         .start(&mut runtime, temp_dir.path().join("bob").to_str().unwrap());
     let (mut alice_node, rules) = BaseNodeBuilder::new(network)

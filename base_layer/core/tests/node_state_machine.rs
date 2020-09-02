@@ -76,7 +76,6 @@ use tari_core::{
     transactions::{helpers::spend_utxos, types::CryptoFactories},
     txn_schema,
     validation::{
-        accum_difficulty_validators::MockAccumDifficultyValidator,
         block_validators::MockStatelessBlockValidator,
         mocks::MockValidator,
     },
@@ -732,7 +731,6 @@ fn test_sync_peer_banning() {
         .with_validators(
             mock_validator,
             stateless_block_validator,
-            MockAccumDifficultyValidator {},
         )
         .start(&mut runtime, data_path);
     let (bob_node, consensus_manager) = BaseNodeBuilder::new(network)
