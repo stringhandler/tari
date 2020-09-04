@@ -108,11 +108,19 @@ impl ProofOfWork {
     ///
     /// The total accumulated difficulty is most often used to decide on which of two forks is the longest chain.
     pub fn total_accumulated_difficulty(&self) -> Difficulty {
-        let d = (self.accumulated_monero_difficulty.as_u64() as f64 *
-            self.accumulated_blake_difficulty.as_u64() as f64)
+        let d = self.total_accumulated_difficulty_squared()
             .sqrt();
 
         Difficulty::from(d.ceil() as u64)
+    }
+
+
+    /// Computes the square of the total accumulated difficulty. This can be
+    /// more efficient than using `total_accumulated_difficulty`, which does a square root, and can
+    /// be used in comparisons, since sqrt(a) > sqrt(b) implies a > b
+    pub fn total_accumulated_difficulty_squared(&self) -> f64 {
+        self.accumulated_monero_difficulty.as_u64() as f64 *
+            self.accumulated_blake_difficulty.as_u64() as f64
     }
 
     /// Replaces the `next` proof of work's difficulty with the sum of this proof of work's total cumulative

@@ -262,13 +262,12 @@ macro_rules! fetch {
 ///     chain_storage::{BlockchainDatabase, BlockchainDatabaseConfig, MemoryDatabase, Validators},
 ///     consensus::{ConsensusManagerBuilder, Network},
 ///     transactions::types::HashDigest,
-///     validation::{accum_difficulty_validators::AccumDifficultyValidator, mocks::MockValidator, Validation},
+///     validation::{mocks::MockValidator, Validation},
 /// };
 /// let db_backend = MemoryDatabase::<HashDigest>::default();
 /// let validators = Validators::new(
 ///     MockValidator::new(true),
 ///     MockValidator::new(true),
-///     AccumDifficultyValidator {},
 /// );
 /// let db = MemoryDatabase::<HashDigest>::default();
 /// let network = Network::LocalNet;
@@ -1537,10 +1536,10 @@ fn handle_reorg<T: BlockchainBackend>(
             target: LOG_TARGET,
             "Comparing candidate block #{} (accum_diff:{}, hash:{}) to main chain #{} (accum_diff: {}, hash: ({})).",
             new_block.header.height,
-            fork_header.total_accumulated_difficulty_inclusive(),
+            fork_header.total_accumulated_difficulty_inclusive_squared(),
             fork_tip_hash.to_hex(),
             tip_header.height,
-            tip_header.total_accumulated_difficulty_inclusive(),
+            tip_header.total_accumulated_difficulty_inclusive_squared(),
             tip_header.hash().to_hex()
         );
     } else {
@@ -1548,12 +1547,12 @@ fn handle_reorg<T: BlockchainBackend>(
             target: LOG_TARGET,
             "Comparing fork (accum_diff:{}, hash:{}) with block #{} ({}) to main chain #{} (accum_diff: {}, hash: \
              ({})).",
-            fork_header.total_accumulated_difficulty_inclusive(),
+            fork_header.total_accumulated_difficulty_inclusive_squared(),
             fork_tip_hash.to_hex(),
             new_block.header.height,
             new_block_hash.to_hex(),
             tip_header.height,
-            tip_header.total_accumulated_difficulty_inclusive(),
+            tip_header.total_accumulated_difficulty_inclusive_squared(),
             tip_header.hash().to_hex()
         );
     }
@@ -1571,7 +1570,7 @@ fn handle_reorg<T: BlockchainBackend>(
             debug!(
                 target: LOG_TARGET,
                 "Fork chain (accum_diff:{}, hash:{}) with block {} ({}) has a weaker difficulty.",
-                fork_header.total_accumulated_difficulty_inclusive(),
+                fork_header.total_accumulated_difficulty_inclusive_squared(),
                 fork_tip_hash.to_hex(),
                 new_block.header.height,
                 new_block_hash.to_hex(),

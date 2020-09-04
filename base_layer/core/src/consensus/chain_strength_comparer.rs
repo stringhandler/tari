@@ -6,12 +6,21 @@ pub trait ChainStrengthComparer {
 }
 
 #[derive(Default)]
-pub struct AccumulatedDifficultyComparer {
+pub struct AccumulatedDifficultySquaredComparer {
 }
 
-impl ChainStrengthComparer for AccumulatedDifficultyComparer{
+impl ChainStrengthComparer for AccumulatedDifficultySquaredComparer{
     fn compare(&self, a: &BlockHeader, b: &BlockHeader) -> Ordering {
-        a.total_accumulated_difficulty_inclusive().cmp(&b.total_accumulated_difficulty_inclusive())
+        let a_val = a.total_accumulated_difficulty_inclusive_squared();
+        let b_val = b.total_accumulated_difficulty_inclusive_squared();
+        if a_val < b_val {
+            Ordering::Less
+        }
+            else {
+                // f64's can never really be equal, so there is no `cmp` for f64
+                // there are also weird NaN edge cases
+                Ordering::Greater
+            }
     }
 }
 
@@ -86,7 +95,7 @@ impl ChainStrengthComparerBuilder {
     }
 
     pub fn by_accumulated_difficulty(mut self) -> Self {
-       self.add_comparer_as_then(Box::new(AccumulatedDifficultyComparer::default()))
+       self.add_comparer_as_then(Box::new(AccumulatedDifficultySquaredComparer::default()))
     }
 
     pub fn by_monero_difficulty(mut self) -> Self {

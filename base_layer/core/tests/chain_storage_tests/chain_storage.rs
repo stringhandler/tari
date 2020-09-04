@@ -2066,10 +2066,7 @@ fn pruned_mode_fetch_insert_and_commit() {
     let sync_height_header = blocks[sync_horizon_height as usize].header.clone();
     assert_eq!(bob_metadata.height_of_longest_chain, Some(sync_horizon_height));
     assert_eq!(bob_metadata.best_block, Some(sync_height_header.hash()));
-    assert_eq!(
-        bob_metadata.accumulated_difficulty,
-        Some(sync_height_header.total_accumulated_difficulty_inclusive())
-    );
+
     // Check headers
     let block_nums = (0..=bob_metadata.height_of_longest_chain.unwrap()).collect::<Vec<u64>>();
     let alice_headers = alice_store.fetch_headers(block_nums.clone()).unwrap();

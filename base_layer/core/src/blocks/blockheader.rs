@@ -159,10 +159,10 @@ impl BlockHeader {
 
     /// Calculates the total accumulated difficulty for the blockchain from the genesis block up until (and including)
     /// this block.
-    pub fn total_accumulated_difficulty_inclusive(&self) -> Difficulty {
+    pub fn total_accumulated_difficulty_inclusive_squared(&self) -> f64 {
         let mut prev_pow = self.pow.clone();
         prev_pow.add_difficulty(&self.pow, self.achieved_difficulty());
-        prev_pow.total_accumulated_difficulty()
+        prev_pow.total_accumulated_difficulty_squared()
     }
 
     pub fn into_builder(self) -> BlockBuilder {
