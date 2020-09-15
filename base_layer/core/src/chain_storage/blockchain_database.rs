@@ -39,7 +39,7 @@ use crate::{
         transaction::{TransactionInput, TransactionKernel, TransactionOutput},
         types::{Commitment, HashOutput, PublicKey, Signature},
     },
-    validation::{StatelessValidation, StatelessValidator, Validation, ValidationError, Validator},
+    validation::{StatelessValidation, StatelessValidator, Validation, Validator},
 };
 use croaring::Bitmap;
 use log::*;

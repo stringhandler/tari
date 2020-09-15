@@ -185,12 +185,6 @@ impl ConsensusManagerBuilder {
             chain_strength_comparer: self.chain_strength_comparer.unwrap_or(
                 strongest_chain()
                     .by_accumulated_difficulty()
-                    .then()
-                    .by_monero_difficulty()
-                    .then()
-                    .by_blake_difficulty()
-                    .then()
-                    .by_height()
                     .build(),
             ),
         };

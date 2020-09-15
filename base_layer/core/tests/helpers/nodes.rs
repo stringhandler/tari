@@ -49,7 +49,6 @@ use tari_core::{
         MempoolValidators,
         OutboundMempoolServiceInterface,
     },
-    proof_of_work::Difficulty,
     transactions::types::HashDigest,
     validation::{
         mocks::MockValidator,

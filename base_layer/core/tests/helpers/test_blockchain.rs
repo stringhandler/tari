@@ -29,11 +29,9 @@ use crate::helpers::{
 };
 use log::*;
 use rand::{rngs::OsRng, RngCore};
-use serde::private::ser::serialize_tagged_newtype;
 use std::collections::HashMap;
 use tari_core::{
-    blocks::Block,
-    chain_storage::{BlockAddResult, BlockchainDatabase, ChainStorageError, MemoryDatabase},
+    chain_storage::{BlockAddResult, BlockchainDatabase, MemoryDatabase},
     consensus::{ConsensusManager, Network},
     transactions::types::HashDigest,
 };

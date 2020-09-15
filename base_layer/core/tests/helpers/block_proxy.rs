@@ -21,18 +21,9 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-use crate::helpers::{
-    block_builders::{chain_block, find_header_with_achieved_difficulty},
-    sample_blockchains::create_new_blockchain,
-};
-use rand::{rngs::OsRng, RngCore};
-use serde::private::ser::serialize_tagged_newtype;
 use tari_core::{
     blocks::Block,
-    chain_storage::{BlockAddResult, BlockchainDatabase, ChainStorageError, MemoryDatabase},
-    transactions::types::HashDigest,
 };
-use tari_crypto::tari_utilities::Hashable;
 
 #[derive(Debug)]
 pub struct BlockProxy {

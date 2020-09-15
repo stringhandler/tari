@@ -1,11 +1,12 @@
 use crate::blocks::BlockHeader;
 use std::cmp::Ordering;
+use std::fmt::Debug;
 
-pub trait ChainStrengthComparer {
+pub trait ChainStrengthComparer: Debug {
     fn compare(&self, a: &BlockHeader, b: &BlockHeader) -> Ordering;
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AccumulatedDifficultySquaredComparer {
 }
 
@@ -24,6 +25,7 @@ impl ChainStrengthComparer for AccumulatedDifficultySquaredComparer{
     }
 }
 
+#[derive(Debug)]
 pub struct ThenComparer {
     before: Box<dyn ChainStrengthComparer + Send + Sync>,
     after: Box<dyn ChainStrengthComparer + Send + Sync>
@@ -47,33 +49,9 @@ impl ChainStrengthComparer for ThenComparer {
     }
 }
 
-#[derive(Default)]
-pub struct MoneroDifficultyComparer {}
-
-impl ChainStrengthComparer for MoneroDifficultyComparer {
-    fn compare(&self, a: &BlockHeader, b: &BlockHeader) -> Ordering {
-        a.pow.accumulated_monero_difficulty.cmp(&b.pow.accumulated_monero_difficulty)
-    }
-}
-
-#[derive(Default)]
-pub struct BlakeDifficultyComparer {}
-
-impl ChainStrengthComparer for BlakeDifficultyComparer {
-    fn compare(&self, a: &BlockHeader, b: &BlockHeader) -> Ordering {
-        a.pow.accumulated_blake_difficulty.cmp(&b.pow.accumulated_blake_difficulty)
-    }
-}
 
 
-#[derive(Default)]
-pub struct HeightComparer {}
 
-impl ChainStrengthComparer for HeightComparer {
-    fn compare(&self, a: &BlockHeader, b: &BlockHeader) -> Ordering {
-        a.height.cmp(&b.height)
-    }
-}
 
 pub struct ChainStrengthComparerBuilder {
     target: Option<Box<dyn ChainStrengthComparer + Send + Sync>>
@@ -94,28 +72,11 @@ impl ChainStrengthComparerBuilder {
         self
     }
 
-    pub fn by_accumulated_difficulty(mut self) -> Self {
+    pub fn by_accumulated_difficulty( self) -> Self {
        self.add_comparer_as_then(Box::new(AccumulatedDifficultySquaredComparer::default()))
     }
 
-    pub fn by_monero_difficulty(mut self) -> Self {
-        self.add_comparer_as_then(Box::new(MoneroDifficultyComparer::default()))
-    }
-
-    pub fn by_blake_difficulty(mut self) -> Self {
-        self.add_comparer_as_then(Box::new(BlakeDifficultyComparer::default()))
-    }
-
-    pub fn by_height(mut self) -> Self {
-        self.add_comparer_as_then(Box::new(HeightComparer::default()))
-    }
-
-    pub fn then(mut self) -> Self {
-        // convenience method for wording
-        self
-    }
-
-    pub fn build(mut self) -> Box<dyn ChainStrengthComparer + Send + Sync> {
+    pub fn build( self) -> Box<dyn ChainStrengthComparer + Send + Sync> {
         self.target.unwrap()
     }
 
