@@ -1029,12 +1029,12 @@ fn handle_reorg_failure_recovery() {
             &consensus_manager.consensus_constants(),
         )
         .unwrap();
-        // Block B3 (Double spend)
+        // Block B3 (Incorrect height)
         let double_spend_block = {
             let schemas = vec![
                 txn_schema!(from: vec![orphan1_outputs[1][3].clone()], to: vec![3 * T]),
                 // Double spend
-                txn_schema!(from: vec![orphan1_outputs[1][3].clone()], to: vec![3 * T]),
+                //txn_schema!(from: vec![orphan1_outputs[1][3].clone()], to: vec![3 * T]),
             ];
             let mut txns = Vec::new();
             let mut block_utxos = Vec::new();
@@ -1052,6 +1052,7 @@ fn handle_reorg_failure_recovery() {
             );
             let mut block = orphan1_store.calculate_mmr_roots(template).unwrap();
             block.header.nonce = OsRng.next_u64();
+            block.header.height = block.header.height + 1;
             find_header_with_achieved_difficulty(&mut block.header, Difficulty::from(2));
             block
         };
@@ -1060,42 +1061,13 @@ fn handle_reorg_failure_recovery() {
         let result = store.add_block(orphan1_blocks[2].clone()).unwrap(); // B2
         unpack_enum!(BlockAddResult::OrphanBlock = result);
 
-        // Add B3 with a double spend. Our (mock) validators are doing a bad job, but still the database should recover.
+        // Add invalid block B3. Our database should recover
         let err = store.add_block(double_spend_block.clone()).unwrap_err(); // B3
-        unpack_enum!(ChainStorageError::UnspendableInput = err);
+        unpack_enum!(ChainStorageError::InvalidBlock = err);
         let tip_header = store.fetch_tip_header().unwrap();
         assert_eq!(tip_header.height, 4);
         assert_eq!(tip_header, blocks[4].header);
 
-        assert!(store.fetch_orphan(orphan1_blocks[2].hash()).is_ok()); // B2 orphaned
-        assert!(store.fetch_orphan(double_spend_block.hash()).is_ok()); // B3 orphaned
-        assert!(store.fetch_orphan(blocks[2].hash()).is_err()); // A2
-        assert!(store.fetch_orphan(blocks[3].hash()).is_err()); // A3
-        assert!(store.fetch_orphan(blocks[4].hash()).is_err()); // A4
-
-        // B3'
-        is_block_valid_flag.store(false, Ordering::SeqCst);
-        let txs = vec![txn_schema!(from: vec![orphan1_outputs[1][1].clone()], to: vec![5 * T])];
-        generate_new_block_with_achieved_difficulty(
-            &mut orphan1_store,
-            &mut orphan1_blocks,
-            &mut orphan1_outputs,
-            txs,
-            Difficulty::from(1),
-            &consensus_manager.consensus_constants(),
-        )
-        .unwrap();
-        // B3
-        let err = store.add_block(orphan1_blocks[3].clone()).unwrap_err();
-        // Mock validator error is returned. This assertions makes sure that the (mock) validator error is returned
-        // and that no other error (caused by say a bug in the rewind/restore code) happened.
-        unpack_enum!(ChainStorageError::ValidationError { .. } = err);
-
-        let tip_header = store.fetch_tip_header().unwrap();
-        assert_eq!(tip_header.height, 4);
-        assert_eq!(tip_header, blocks[4].header);
-
-        assert!(store.fetch_orphan(orphan1_blocks[3].hash()).is_ok()); // B3' orphaned
         assert!(store.fetch_orphan(blocks[2].hash()).is_err()); // A2
         assert!(store.fetch_orphan(blocks[3].hash()).is_err()); // A3
         assert!(store.fetch_orphan(blocks[4].hash()).is_err()); // A4
