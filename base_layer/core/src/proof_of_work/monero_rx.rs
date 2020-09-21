@@ -165,14 +165,6 @@ impl MoneroData {
     }
 }
 
-/// Calculate the difficulty attained for the given block deserialized the Monero header from the provided header
-pub fn monero_difficulty(header: &BlockHeader) -> Difficulty {
-    match monero_difficulty_calculation(header) {
-        Ok(v) => v,
-        Err(_) => 0.into(),
-    }
-}
-
 /// Checks if the hash is valid.
 pub fn check_hash(target_difficulty: u64, hash: &[u8]) -> bool {
     // Use 512-bit integers to prevent integer overflow
@@ -192,7 +184,7 @@ pub fn check_hash(target_difficulty: u64, hash: &[u8]) -> bool {
 
 /// Internal function to calculate the difficulty attained for the given block Deserialized the Monero header from the
 /// provided header
-fn monero_difficulty_calculation(header: &BlockHeader) -> Result<Difficulty, MergeMineError> {
+pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineError> {
     let monero = MoneroData::new(header)?;
     verify_header(&header, &monero)?;
     let flags = RandomXFlag::get_recommended_flags();
