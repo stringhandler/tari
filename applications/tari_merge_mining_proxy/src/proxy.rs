@@ -158,9 +158,7 @@ impl InnerService {
             .ok_or_else(|| MmProxyError::GrpcResponseMissingField("metadata"))?;
         debug!(
             target: LOG_TARGET,
-            "Monero height = {}, Tari base node height = {}",
-            json["height"],
-            height
+            "Monero height = {}, Tari base node height = {}", json["height"], height
         );
 
         let mut transient = self.state.transient_data.write().await;
@@ -388,7 +386,7 @@ impl InnerService {
         let monero_difficulty: u64 = monerod_resp["result"]["difficulty"].as_u64().unwrap_or_default();
         let tari_difficulty = mining_data.target_difficulty;
 
-        let mut mining_difficulty = min(monero_difficulty, tari_difficulty);
+        let mining_difficulty = min(monero_difficulty, tari_difficulty);
 
         transient.monero_difficulty = Some(monero_difficulty);
         transient.tari_difficulty = Some(tari_difficulty);
