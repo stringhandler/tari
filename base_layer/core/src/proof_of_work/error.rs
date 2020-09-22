@@ -22,13 +22,17 @@
 
 use crate::proof_of_work::monero_rx::MergeMineError;
 use thiserror::Error;
+use crate::proof_of_work::Difficulty;
 
 #[derive(Clone, Debug, Error)]
 pub enum PowError {
     #[error("ProofOfWorkFailed")]
     InvalidProofOfWork,
-    #[error("Target difficulty not achieved")]
-    AchievedDifficultyTooLow,
+    #[error("Target difficulty '{target} not achieved. Achieved difficulty: {achieved}")]
+    AchievedDifficultyTooLow{
+        target: Difficulty,
+        achieved: Difficulty
+    },
     #[error("Invalid target difficulty")]
     InvalidTargetDifficulty,
     #[error("Invalid merge mining data or operation: {0}")]

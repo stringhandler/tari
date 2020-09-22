@@ -137,7 +137,7 @@ pub fn check_achieved_and_target_difficulty<B: BlockchainBackend>(
             target
         );
         return Err(ValidationError::BlockHeaderError(
-            BlockHeaderValidationError::ProofOfWorkError(PowError::AchievedDifficultyTooLow),
+            BlockHeaderValidationError::ProofOfWorkError(PowError::AchievedDifficultyTooLow{achieved, target}),
         ));
     }
     Ok(())

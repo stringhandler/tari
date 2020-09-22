@@ -121,7 +121,7 @@ impl<B: BlockchainBackend> HeaderValidator<B> {
                 target
             );
             return Err(ValidationError::BlockHeaderError(
-                BlockHeaderValidationError::ProofOfWorkError(PowError::AchievedDifficultyTooLow),
+                BlockHeaderValidationError::ProofOfWorkError(PowError::AchievedDifficultyTooLow{achieved, target}),
             ));
         }
 
