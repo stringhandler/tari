@@ -28,7 +28,7 @@ use crate::proof_of_work::Difficulty;
 pub enum PowError {
     #[error("ProofOfWorkFailed")]
     InvalidProofOfWork,
-    #[error("Target difficulty '{target} not achieved. Achieved difficulty: {achieved}")]
+    #[error("Target difficulty {target} not achieved. Achieved difficulty: {achieved}")]
     AchievedDifficultyTooLow{
         target: Difficulty,
         achieved: Difficulty

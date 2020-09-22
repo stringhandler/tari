@@ -184,7 +184,7 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
     let dataset = RandomXDataset::new(flags, &cache, 0)?;
     let vm = RandomXVM::new(flags, Some(&cache), Some(&dataset))?;
     let hash = vm.calculate_hash((&input).as_ref())?;
-    let scalar = U256::from_little_endian(&hash); // Big endian so the hash has leading zeroes
+    let scalar = U256::from_big_endian(&hash); // Big endian so the hash has leading zeroes
     let result = MAX_TARGET / scalar;
     let difficulty = Difficulty::from(result.low_u64());
     Ok(difficulty)
