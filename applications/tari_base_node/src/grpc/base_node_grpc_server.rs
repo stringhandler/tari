@@ -354,16 +354,16 @@ impl tari_rpc::base_node_server::BaseNode for BaseNodeGrpcServer {
         let target_difficulty = new_block.header.pow.target_difficulty;
         let reward = cm.calculate_coinbase_and_fees(&new_block);
         let block: Option<tari_rpc::Block> = Some(new_block.into());
-        let mining_data = Some(tari_rpc::MinerData {
+        let miner_data = Some(tari_rpc::MinerData {
             algo: Some(tari_rpc::PowAlgo { pow_algo: pow }),
             target_difficulty: target_difficulty.as_u64(),
             reward: reward.0,
-            mergemining_hash: mining_hash,
+            merge_mining_hash: mining_hash,
         });
         let response = tari_rpc::GetNewBlockResult {
             block_hash,
             block,
-            mining_data,
+            miner_data,
         };
         debug!(target: LOG_TARGET, "Sending GetNewBlock response to client");
         Ok(Response::new(response))
