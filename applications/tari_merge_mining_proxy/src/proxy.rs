@@ -287,6 +287,13 @@ impl InnerService {
             target: LOG_TARGET,
             "Received new block template from Tari base node for height #{}",
             new_block_template.header.as_ref().map(|h| h.height).unwrap_or_default(),
+
+        );
+
+        debug!(
+            target: LOG_TARGET,
+            "Received Tari block template:{:?}",
+            new_block_template
         );
 
         let template_block = NewBlockTemplate::try_from(new_block_template.clone())
@@ -317,6 +324,7 @@ impl InnerService {
             })?
             .into_inner();
 
+        debug!(target: LOG_TARGET, "New block received from Tari: {:?}", block);
         let mining_data = block
             .clone()
             .miner_data
