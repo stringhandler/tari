@@ -21,6 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{blocks::BlockHeader, proof_of_work::Difficulty, tari_utilities::ByteArray, U512};
+use crate::U256;
 use monero::{
     blockdata::{
         block::{Block as MoneroBlock, BlockHeader as MoneroBlockHeader},
@@ -34,6 +35,8 @@ use randomx_rs::{RandomXCache, RandomXDataset, RandomXError, RandomXFlag, Random
 use serde::{Deserialize, Serialize};
 use std::iter;
 use thiserror::Error;
+
+const MAX_TARGET: U256 = U256::MAX;
 
 #[derive(Debug, Error, Clone)]
 pub enum MergeMineError {
@@ -66,8 +69,6 @@ pub struct MoneroData {
     pub transaction_hashes: Vec<[u8; 32]>,
     // Coinbase tx from Monero
     pub coinbase_tx: MoneroTransaction,
-    // Difficulty
-    pub difficulty: u64,
 }
 
 // Hash algorithm in monero
@@ -165,23 +166,6 @@ impl MoneroData {
     }
 }
 
-/// Checks if the hash is valid.
-pub fn check_hash(target_difficulty: u64, hash: &[u8]) -> bool {
-    // Use 512-bit integers to prevent integer overflow
-
-    // Monero hashes are in little endian format!
-    let mut little_endian = U512::from_little_endian(hash);
-    let max_u128 = U512::from(u128::max_value()) + 1;
-    let max_u256 = max_u128 * max_u128;
-
-    little_endian = (max_u256 - 1) / little_endian;
-    let difficulty = U512::from(target_difficulty);
-    if little_endian * difficulty <= max_u256 - 1 {
-        return true;
-    }
-    false
-}
-
 /// Internal function to calculate the difficulty attained for the given block Deserialized the Monero header from the
 /// provided header
 pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineError> {
@@ -200,10 +184,10 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
     let dataset = RandomXDataset::new(flags, &cache, 0)?;
     let vm = RandomXVM::new(flags, Some(&cache), Some(&dataset))?;
     let hash = vm.calculate_hash((&input).as_ref())?;
-    if check_hash(monero.difficulty, &hash) {
-        return Ok(Difficulty::from(monero.difficulty));
-    }
-    Err(MergeMineError::ValidationError("Not enough proof of work".to_string()))
+    let scalar = U256::from_little_endian(&hash); // Big endian so the hash has leading zeroes
+    let result = MAX_TARGET / scalar;
+    let difficulty = Difficulty::from(result.low_u64());
+    Ok(difficulty)
 }
 
 /// Appends merge mining hash to a Monero block
@@ -222,7 +206,7 @@ pub fn append_merge_mining_tag<T: AsRef<[u8]>>(block: &mut MoneroBlock, hash: T)
 }
 
 /// Creates a hex encoded Monero blockhashing_blob
-pub fn create_input_blob(block: &MoneroBlock) -> Result<String, MergeMineError> {
+pub fn create_blockhashing_blob(block: &MoneroBlock) -> Result<String, MergeMineError> {
     let tx_hashes = create_ordered_transaction_hashes_from_block(block);
     create_input_blob_from_parts(&block.header, &tx_hashes)
 }
@@ -301,7 +285,7 @@ mod test {
             monero_rx::{
                 append_merge_mining_tag,
                 check_hash,
-                create_input_blob,
+                create_blockhashing_blob,
                 create_input_blob_from_parts,
                 create_ordered_transaction_hashes_from_block,
                 from_hashes_to_array,
@@ -510,7 +494,7 @@ mod test {
         let blocktemplate_blob = "0c0c8cd6a0fa057fe21d764e7abf004e975396a2160773b93712bf6118c3b4959ddd8ee0f76aad0000000002e1ea2701ffa5ea2701d5a299e2abb002028eb3066ced1b2cc82ea046f3716a48e9ae37144057d5fb48a97f941225a1957b2b0106225b7ec0a6544d8da39abe68d8bd82619b4a7c5bdae89c3783b256a8fa47820208f63aa86d2e857f070000".to_string();
         let bytes = hex::decode(blocktemplate_blob).unwrap();
         let block = deserialize::<MoneroBlock>(&bytes[..]).unwrap();
-        let input_blob = create_input_blob(&block).unwrap();
+        let input_blob = create_blockhashing_blob(&block).unwrap();
         assert_eq!(input_blob, "0c0c8cd6a0fa057fe21d764e7abf004e975396a2160773b93712bf6118c3b4959ddd8ee0f76aad0000000058b030b6800d433bbcb2b560afe2a08e4dc152fa77ead96d37aaf14897d3c09601");
     }
 
@@ -846,7 +830,6 @@ mod test {
             transaction_root: root.to_fixed_bytes(),
             transaction_hashes: from_hashes_to_array(hashes),
             coinbase_tx: block.miner_tx,
-            difficulty: 18471,
         };
         let serialized = bincode::serialize(&monero_data).unwrap();
         let pow = ProofOfWork {
@@ -857,7 +840,7 @@ mod test {
             pow_data: serialized,
         };
         block_header.pow = pow;
-        assert_ne!(monero_difficulty(&block_header).as_u64(), 0);
+        assert_eq!(monero_difficulty(&block_header).as_u64(), 0);
     }
 
     #[test]
