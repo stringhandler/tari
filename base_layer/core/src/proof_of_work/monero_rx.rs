@@ -20,7 +20,7 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{blocks::BlockHeader, proof_of_work::Difficulty, tari_utilities::ByteArray, U512};
+use crate::{blocks::BlockHeader, proof_of_work::Difficulty, tari_utilities::ByteArray};
 use crate::U256;
 use monero::{
     blockdata::{
@@ -35,6 +35,10 @@ use randomx_rs::{RandomXCache, RandomXDataset, RandomXError, RandomXFlag, Random
 use serde::{Deserialize, Serialize};
 use std::iter;
 use thiserror::Error;
+use tari_crypto::tari_utilities::hex::Hex;
+use log::*;
+
+const LOG_TARGET: &str = "c::pow::monero";
 
 const MAX_TARGET: U256 = U256::MAX;
 
@@ -184,6 +188,7 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
     let dataset = RandomXDataset::new(flags, &cache, 0)?;
     let vm = RandomXVM::new(flags, Some(&cache), Some(&dataset))?;
     let hash = vm.calculate_hash((&input).as_ref())?;
+    debug!(target: LOG_TARGET, "Monero hash: {}", hash.to_hex());
     let scalar = U256::from_big_endian(&hash); // Big endian so the hash has leading zeroes
     let result = MAX_TARGET / scalar;
     let difficulty = Difficulty::from(result.low_u64());
