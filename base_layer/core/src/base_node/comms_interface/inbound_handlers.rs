@@ -53,6 +53,7 @@ use strum_macros::Display;
 use tari_comms::peer_manager::NodeId;
 use tari_crypto::tari_utilities::{hash::Hashable, hex::Hex};
 use tokio::sync::Semaphore;
+use std::cmp;
 
 const LOG_TARGET: &str = "c::bn::comms_interface::inbound_handler";
 const MAX_HEADERS_PER_RESPONSE: u32 = 100;
@@ -540,13 +541,14 @@ where T: BlockchainBackend + 'static
             self.blockchain_db
                 .fetch_target_difficulties(pow_algo, height_of_longest_chain, block_window)?;
 
-        let target = get_target_difficulty(
+        let mut target = get_target_difficulty(
             target_difficulties,
             block_window,
             constants.get_diff_target_block_interval(),
             constants.min_pow_difficulty(pow_algo),
             constants.get_difficulty_max_block_interval(),
         )?;
+        target = cmp::max(target, constants.min_pow_difficulty(pow_algo));
         debug!(target: LOG_TARGET, "Target difficulty:{} for PoW:{}", target, pow_algo);
         Ok(target)
     }
