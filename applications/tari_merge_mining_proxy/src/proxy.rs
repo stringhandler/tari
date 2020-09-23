@@ -43,7 +43,7 @@ use hyper::{
     Version,
 };
 use jsonrpc::error::StandardError;
-use log::*;
+use tracing::{info, debug, error, instrument};
 use reqwest::{ResponseBuilderExt, Url};
 use serde_json as json;
 use std::{cmp::min, convert::TryFrom, future::Future, net::SocketAddr, task::{Context, Poll}, cmp};
@@ -86,7 +86,7 @@ pub struct MergeMiningProxyService {
 impl MergeMiningProxyService {
     pub fn new(config: MergeMiningProxyConfig, block_templates: BlockTemplateRepository) -> Self {
         Self {
-            inner: InnerService { config, block_templates},
+            inner: InnerService { config, block_templates, http_client : reqwest::Client::new() },
         }
     }
 }
@@ -122,10 +122,12 @@ impl Service<Request<Body>> for MergeMiningProxyService {
 #[derive(Debug, Clone)]
 struct InnerService {
     config: MergeMiningProxyConfig,
-    block_templates: BlockTemplateRepository
+    block_templates: BlockTemplateRepository,
+    http_client: reqwest::Client
 }
 
 impl InnerService {
+    #[instrument]
     async fn handle_get_height(&mut self, monerod_resp: Response<json::Value>) -> Result<Response<Body>, MmProxyError> {
         let (parts, mut json) = monerod_resp.into_parts();
         if json["height"].is_null() {
@@ -348,10 +350,13 @@ impl InnerService {
         // Must be done after the tag is inserted since it will affect the hash of the miner tx
         let blockhashing_blob = monero_rx::create_blockhashing_blob(&monero_block)?;
 
+        debug!(target: LOG_TARGET, "blockhashing_blob:{}", blockhashing_blob);
         monerod_resp["result"]["blockhashing_blob"] = blockhashing_blob.into();
 
         let blocktemplate_blob = helpers::serialize_monero_block_to_hex(&monero_block)?;
+        debug!(target: LOG_TARGET, "blocktemplate_blob:{}", block_template_blob);
         monerod_resp["result"]["blocktemplate_blob"] = blocktemplate_blob.into();
+
 
         let seed = monerod_resp["result"]["seed_hash"].to_string().replace("\"", "");
 
@@ -370,6 +375,8 @@ impl InnerService {
             "Difficulties: Tari ({}), Monero({}),Selected({})", tari_difficulty, monero_difficulty, mining_difficulty
         );
         monerod_resp["result"]["difficulty"] = mining_difficulty.into();
+
+        debug!(target: LOG_TARGET, "Returning template result: {}", monerod_resp);
         Ok(into_body(parts, monerod_resp))
     }
 
@@ -440,7 +447,7 @@ impl InnerService {
                 monerod_uri,
                 json["method"]
             );
-            let mut builder = reqwest::Client::new()
+            let mut builder = self.http_client
                 .request(request.method().clone(), monerod_uri)
                 .headers(request.headers().clone());
 

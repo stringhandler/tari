@@ -306,8 +306,8 @@ mod test {
         );
 
         let reorg_blocks = vec![
-            create_orphan_block(3000, vec![(*tx3).clone(), (*tx4).clone()], &consensus_constants),
-            create_orphan_block(4000, vec![(*tx1).clone(), (*tx2).clone()], &consensus_constants),
+            create_orphan_block(3000, vec![(*tx3).clone(), (*tx4).clone()], &consensus_constants[0]),
+            create_orphan_block(4000, vec![(*tx1).clone(), (*tx2).clone()], &consensus_constants[0]),
         ];
 
         let removed_txs = reorg_pool

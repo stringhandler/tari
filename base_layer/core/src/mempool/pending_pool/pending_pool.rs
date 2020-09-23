@@ -342,7 +342,7 @@ mod test {
         assert!(snapshot_txs.contains(&tx5));
         assert!(snapshot_txs.contains(&tx6));
 
-        let published_block = create_orphan_block(1500, vec![(*tx6).clone()], &consensus_constants);
+        let published_block = create_orphan_block(1500, vec![(*tx6).clone()], &consensus_constants[0]);
         let unlocked_txs = pending_pool
             .remove_unlocked_and_discard_double_spends(&published_block)
             .unwrap();

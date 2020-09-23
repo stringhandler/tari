@@ -355,7 +355,7 @@ mod test {
         let published_block = create_orphan_block(
             0,
             vec![(*tx1).clone(), (*tx3).clone(), (*tx5).clone()],
-            &consensus_constants,
+            &consensus_constants[0],
         );
         let _ = unconfirmed_pool.remove_published_and_discard_double_spends(&published_block);
 
@@ -422,7 +422,7 @@ mod test {
         let published_block = create_orphan_block(
             0,
             vec![(*tx1).clone(), (*tx2).clone(), (*tx3).clone()],
-            &consensus_constants,
+            &consensus_constants[0],
         );
 
         let _ = unconfirmed_pool.remove_published_and_discard_double_spends(&published_block); // Double spends are discarded

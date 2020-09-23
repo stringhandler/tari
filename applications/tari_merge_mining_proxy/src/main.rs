@@ -48,6 +48,7 @@ use crate::block_template_data::BlockTemplateRepository;
 
 #[tokio_macros::main]
 async fn main() -> Result<(), MmProxyError> {
+    tracing_subscriber::fmt::init();
     let config = initialize()?;
 
     let state = SharedState {
