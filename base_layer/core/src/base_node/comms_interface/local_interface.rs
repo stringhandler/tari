@@ -134,22 +134,6 @@ impl LocalNodeCommsInterface {
         }
     }
 
-    /// Request the PoW target difficulty for mining on the main chain from the base node service.
-    pub async fn get_target_difficulty(
-        &mut self,
-        pow_algorithm: PowAlgorithm,
-    ) -> Result<Difficulty, CommsInterfaceError>
-    {
-        match self
-            .request_sender
-            .call(NodeCommsRequest::GetTargetDifficulty(pow_algorithm))
-            .await??
-        {
-            NodeCommsResponse::TargetDifficulty(difficulty) => Ok(difficulty),
-            _ => Err(CommsInterfaceError::UnexpectedApiResponse),
-        }
-    }
-
     /// Submit a block to the base node service. Internal_only flag will prevent propagation.
     pub async fn submit_block(&mut self, block: Block, propagate: Broadcast) -> Result<(), CommsInterfaceError> {
         self.block_sender.call((block, propagate)).await?
