@@ -80,7 +80,7 @@ impl<B: BlockchainBackend> HeaderValidator<B> {
         } else {
             let target_difficulties = self.fetch_target_difficulties(block_header)?;
 
-            let constants = self.rules.consensus_constants();
+            let constants = self.rules.consensus_constants(block_header.height);
             get_target_difficulty(
                 target_difficulties,
                 constants.get_difficulty_block_window() as usize,
@@ -134,7 +134,7 @@ impl<B: BlockchainBackend> HeaderValidator<B> {
         block_header: &BlockHeader,
     ) -> Result<Vec<(EpochTime, Difficulty)>, ValidationError>
     {
-        let block_window = self.rules.consensus_constants().get_difficulty_block_window();
+        let block_window = self.rules.consensus_constants(block_header.height).get_difficulty_block_window();
         let start_height = block_header.height.saturating_sub(block_window);
         if start_height == block_header.height {
             return Ok(vec![]);
@@ -194,7 +194,7 @@ impl<B: BlockchainBackend> HeaderValidator<B> {
 
         let start_height = block_header
             .height
-            .saturating_sub(self.rules.consensus_constants().get_median_timestamp_count() as u64);
+            .saturating_sub(self.rules.consensus_constants(block_header.height).get_median_timestamp_count() as u64);
 
         if start_height == block_header.height {
             return Ok(());

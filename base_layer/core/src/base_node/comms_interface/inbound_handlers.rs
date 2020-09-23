@@ -330,23 +330,22 @@ where T: BlockchainBackend + 'static
             },
             NodeCommsRequest::GetNewBlockTemplate(pow_algo) => {
                 let metadata = async_db::get_chain_metadata(self.blockchain_db.clone()).await?;
+                let constants = self.consensus_manager.consensus_constants(metadata.height_of_longest_chain());
+
                 let best_block_hash = metadata
                     .best_block
                     .ok_or_else(|| CommsInterfaceError::UnexpectedApiResponse)?;
                 let best_block_header =
                     async_db::fetch_header_by_block_hash(self.blockchain_db.clone(), best_block_hash).await?;
 
-                let constants = self.consensus_manager.consensus_constants();
-                let mut header = BlockHeader::from_previous(&best_block_header)?;
+                 let mut header = BlockHeader::from_previous(&best_block_header)?;
                 header.version = constants.blockchain_version();
                 header.pow.target_difficulty = self.get_target_difficulty(*pow_algo).await?;
                 header.pow.pow_algo = *pow_algo;
 
                 let transactions = async_mempool::retrieve(
                     self.mempool.clone(),
-                    self.consensus_manager
-                        .consensus_constants()
-                        .get_max_block_weight_excluding_coinbase(),
+                        constants.get_max_block_weight_excluding_coinbase(),
                 )
                 .await?
                 .iter()
@@ -535,7 +534,7 @@ where T: BlockchainBackend + 'static
             height_of_longest_chain,
             pow_algo
         );
-        let constants = self.consensus_manager.consensus_constants();
+        let constants = self.consensus_manager.consensus_constants(height_of_longest_chain);
         let block_window = constants.get_difficulty_block_window() as usize;
         let target_difficulties =
             self.blockchain_db

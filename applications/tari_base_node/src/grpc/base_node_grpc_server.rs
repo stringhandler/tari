@@ -505,7 +505,8 @@ impl tari_rpc::base_node_server::BaseNode for BaseNodeGrpcServer {
         debug!(target: LOG_TARGET, "Incoming GRPC request for GetConstants",);
         let network: Network = self.node_config.network.into();
         debug!(target: LOG_TARGET, "Sending GetConstants response to client");
-        Ok(Response::new(network.create_consensus_constants().into()))
+        // TODO: Switch to request height
+        Ok(Response::new(network.create_consensus_constants().pop().unwrap().into()))
     }
 
     async fn get_block_size(
@@ -540,7 +541,7 @@ impl tari_rpc::base_node_server::BaseNode for BaseNodeGrpcServer {
             .drain(..cmp::min(heights.len(), GET_TOKENS_IN_CIRCULATION_MAX_HEIGHTS))
             .collect();
         let network: Network = self.node_config.network.into();
-        let constants = network.create_consensus_constants();
+        let constants = network.create_consensus_constants().pop().unwrap();
         let (mut tx, rx) = mpsc::channel(GET_TOKENS_IN_CIRCULATION_PAGE_SIZE);
         self.executor.spawn(async move {
             let mut page: Vec<u64> = heights

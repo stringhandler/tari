@@ -25,6 +25,7 @@ use crate::{
     proof_of_work::{difficulty::DifficultyAdjustment, lwma_diff::LinearWeightedMovingAverage, Difficulty},
 };
 use tari_crypto::tari_utilities::epoch_time::EpochTime;
+use std::cmp;
 
 /// Returns the estimated target difficulty for the provided set of target difficulties.
 pub fn get_target_difficulty(
@@ -39,7 +40,7 @@ pub fn get_target_difficulty(
     for (epoch, difficulty) in target_difficulties {
         lwma.add(epoch, difficulty)?;
     }
-    let target_difficulty = lwma.get_difficulty();
-    // TODO: This should be capped at the minimum difficulty, but blocks are already using the old value
+    let mut target_difficulty = lwma.get_difficulty();
+    target_difficulty = cmp::max(target_difficulty, min_difficulty);
     Ok(target_difficulty)
 }
