@@ -517,6 +517,7 @@ impl InnerService {
 
     async fn handle(mut self, request: Request<Body>) -> Result<Response<Body>, MmProxyError> {
         debug!(target: LOG_TARGET, "Got request: {}", request.uri());
+        debug!(target: LOG_TARGET, "Request headers: {:?}", request.headers());
         let (request, monerod_resp) = self.proxy_request_to_monerod(request).await?;
         // Any failed (!= 200 OK) responses from Monero are immediately returned to the requester
         if !monerod_resp.status().is_success() {
