@@ -186,7 +186,9 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
 
     let tx_hashes = transaction_hashes.iter().map(Into::into).collect::<Vec<_>>();
     let input = create_input_blob_from_parts(&monero.header, &tx_hashes)?;
-    let cache = RandomXCache::new(flags, &from_hex(&key)?)?;
+    let mut key_bytes =from_hex(&key)?;
+    key_bytes.reverse();
+    let cache = RandomXCache::new(flags, &key_bytes)?;
     let dataset = RandomXDataset::new(flags, &cache, 0)?;
     let vm = RandomXVM::new(flags, Some(&cache), Some(&dataset))?;
     let hash = vm.calculate_hash((&input).as_ref())?;
