@@ -39,7 +39,7 @@ use std::sync::Arc;
 use tari_crypto::tari_utilities::hash::Hashable;
 use thiserror::Error;
 
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error)]
 pub enum ConsensusManagerError {
     #[error("Difficulty adjustment encountered an error: `{0}`")]
     DifficultyAdjustmentError(#[from] DifficultyAdjustmentError),

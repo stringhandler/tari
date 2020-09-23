@@ -24,7 +24,7 @@ use crate::proof_of_work::monero_rx::MergeMineError;
 use thiserror::Error;
 use crate::proof_of_work::Difficulty;
 
-#[derive(Clone, Debug, Error)]
+#[derive(Debug, Error)]
 pub enum PowError {
     #[error("ProofOfWorkFailed")]
     InvalidProofOfWork,

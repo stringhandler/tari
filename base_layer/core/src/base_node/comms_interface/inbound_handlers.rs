@@ -63,7 +63,7 @@ const MAX_HEADERS_PER_RESPONSE: u32 = 100;
 #[derive(Debug, Clone, Display)]
 pub enum BlockEvent {
     Verified((Box<Block>, BlockAddResult, Broadcast)),
-    Invalid((Box<Block>, ChainStorageError, Broadcast)),
+    Invalid((Box<Block>, String, Broadcast)),
 }
 
 /// Used to notify if the block event is for a propagated block.
@@ -509,7 +509,7 @@ where T: BlockchainBackend + 'static
                     block_hash.to_hex(),
                     e
                 );
-                self.publish_block_event(BlockEvent::Invalid((Box::new(block), e.clone(), broadcast)));
+                self.publish_block_event(BlockEvent::Invalid((Box::new(block), e.to_string(), broadcast)));
                 Err(CommsInterfaceError::ChainStorageError(e))
             },
         }

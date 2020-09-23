@@ -35,14 +35,14 @@ use randomx_rs::{RandomXCache, RandomXDataset, RandomXError, RandomXFlag, Random
 use serde::{Deserialize, Serialize};
 use std::iter;
 use thiserror::Error;
-use tari_crypto::tari_utilities::hex::Hex;
+use tari_crypto::tari_utilities::hex::{Hex, from_hex, HexError};
 use log::*;
 
 const LOG_TARGET: &str = "c::pow::monero";
 
 const MAX_TARGET: U256 = U256::MAX;
 
-#[derive(Debug, Error, Clone)]
+#[derive(Debug, Error)]
 pub enum MergeMineError {
     #[error("Serialization error: {0}")]
     SerializeError(String),
@@ -54,6 +54,8 @@ pub enum MergeMineError {
     RandomXError(#[from] RandomXError),
     #[error("Validation error: {0}")]
     ValidationError(String),
+    #[error("Hex conversion error: {0}")]
+    HexError(#[from] HexError)
 }
 
 /// This is a struct to deserialize the data from he pow field into data required for the randomX Monero merged mine
@@ -184,7 +186,7 @@ pub fn monero_difficulty(header: &BlockHeader) -> Result<Difficulty, MergeMineEr
 
     let tx_hashes = transaction_hashes.iter().map(Into::into).collect::<Vec<_>>();
     let input = create_input_blob_from_parts(&monero.header, &tx_hashes)?;
-    let cache = RandomXCache::new(flags, (&key).as_ref())?;
+    let cache = RandomXCache::new(flags, &from_hex(&key)?)?;
     let dataset = RandomXDataset::new(flags, &cache, 0)?;
     let vm = RandomXVM::new(flags, Some(&cache), Some(&dataset))?;
     let hash = vm.calculate_hash((&input).as_ref())?;
