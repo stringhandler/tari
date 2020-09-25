@@ -4125,6 +4125,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tracing",
+ "tracing-futures",
  "tracing-subscriber",
  "url 2.1.1",
 ]

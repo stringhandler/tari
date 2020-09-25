@@ -43,7 +43,7 @@ use hyper::{
     Version,
 };
 use jsonrpc::error::StandardError;
-use tracing::{info, debug, error, instrument};
+use tracing::{info, debug, error, instrument, trace, warn};
 use reqwest::{ResponseBuilderExt, Url};
 use serde_json as json;
 use std::{cmp::min, convert::TryFrom, future::Future, net::SocketAddr, task::{Context, Poll}, cmp};
