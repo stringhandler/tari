@@ -292,12 +292,6 @@ impl InnerService {
 
         );
 
-        debug!(
-            target: LOG_TARGET,
-            "Received Tari block template:{:?}",
-            new_block_template
-        );
-
         let template_block = NewBlockTemplate::try_from(new_block_template.clone())
             .map_err(|e| MmProxyError::MissingDataError(format!("GRPC Conversion Error: {}", e)))?;
 
