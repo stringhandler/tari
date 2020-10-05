@@ -58,8 +58,6 @@ pub struct GlobalConfig {
     pub orphan_storage_capacity: usize,
     pub pruning_horizon: u64,
     pub pruned_mode_cleanup_interval: u64,
-    pub core_threads: usize,
-    pub blocking_threads: usize,
     pub identity_file: PathBuf,
     pub public_address: Multiaddr,
     pub grpc_enabled: bool,
@@ -206,17 +204,6 @@ fn convert_node_config(network: Network, cfg: Config) -> Result<GlobalConfig, Co
     let pruned_mode_cleanup_interval = cfg
         .get_int(&key)
         .map_err(|e| ConfigurationError::new(&key, &e.to_string()))? as u64;
-
-    // Thread counts
-    let key = config_string("base_node", &net_str, "core_threads");
-    let core_threads = cfg
-        .get_int(&key)
-        .map_err(|e| ConfigurationError::new(&key, &e.to_string()))? as usize;
-
-    let key = config_string("base_node", &net_str, "blocking_threads");
-    let blocking_threads = cfg
-        .get_int(&key)
-        .map_err(|e| ConfigurationError::new(&key, &e.to_string()))? as usize;
 
     // NodeIdentity path
     let key = config_string("base_node", &net_str, "identity_file");
@@ -436,8 +423,6 @@ fn convert_node_config(network: Network, cfg: Config) -> Result<GlobalConfig, Co
         orphan_storage_capacity,
         pruning_horizon,
         pruned_mode_cleanup_interval,
-        core_threads,
-        blocking_threads,
         identity_file,
         public_address,
         grpc_enabled,

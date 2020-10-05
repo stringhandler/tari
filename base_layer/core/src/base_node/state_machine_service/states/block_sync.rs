@@ -343,6 +343,19 @@ async fn synchronize_blocks<B: BlockchainBackend + 'static>(
                     attempts = 0;
                     // if we took less than half the timeout, try doubling the
                     // blocks we request
+                    if timer.elapsed() < BASE_NODE_SERVICE_REQUEST_TIMEOUT / 2 {
+                        block_window = blocks_synced * 2;
+                    } else {
+                        // Otherwise, request the same number of blocks. `request_and_add_blocks` automatically
+                        // scales down
+                        block_window = blocks_synced;
+                    }
+                }
+                if blocks_synced > 0 {
+                    // if we synced at least one block, reset the attempt counter
+                    attempts = 0;
+                    // if we took less than half the timeout, try doubling the
+                    // blocks we request
                     if timer.elapsed() < shared.config.block_sync_config.fetch_blocks_timeout / 2 {
                         block_window = blocks_synced * 2;
                     } else {
@@ -477,52 +490,48 @@ async fn request_and_add_blocks<B: BlockchainBackend + 'static>(
         }
 
         shared.publish_event_info();
-        info!(target: LOG_TARGET, "Adding block to db: {}", block);
-            match async_db::add_block(shared.db.clone(), block.clone()).await {
-                Ok(BlockAddResult::Ok) => {
-                    info!(
-                        target: LOG_TARGET,
-                        "Block #{} ({}) successfully added to database", block_height, block_hash_hex
-                    );
-                    block_nums.remove(0);
-                },
-                Ok(BlockAddResult::OrphanBlock) => {
-                    warn!(
-                        target: LOG_TARGET,
-                        "Received orphan block #{} ({}) from peer `{}`",
-                        block_height,
-                        block_hash_hex,
-                        sync_peer.node_id
-                    );
-                    block_nums.remove(0);
-                },
-                Ok(BlockAddResult::ChainReorg(removed, added)) => {
-                    warn!(
-                        target: LOG_TARGET,
-                        "Block #{} ({}) caused a reorg during block sync. (#removed = {}, #added = {})",
-                        block_height,
-                        block_hash_hex,
-                        removed.len(),
-                        added.len()
-                    );
-                    block_nums.remove(0);
-                },
-                Ok(BlockAddResult::BlockExists) => {
-                    warn!(
-                        target: LOG_TARGET,
-                        "Block #{} ({}) already exists.", block_height, block_hash_hex
-                    );
-                    block_nums.remove(0);
-                },
-                Err(ChainStorageError::InvalidBlock) => {
-                    warn!(
-                        target: LOG_TARGET,
-                        "Invalid block {} received from peer.", block_hash_hex,
-                    );
-                    debug!(
-                        target: LOG_TARGET,
-                        "Banning peer {} from local node, because they supplied invalid block", sync_peer
-                    );
+        info!(target: LOG_TARGET, "Adding block to db: {}", block);match async_db::add_block(shared.db.clone(), block.clone()).await {
+            Ok(BlockAddResult::Ok) => {
+                info!(
+                    target: LOG_TARGET,
+                    "Block #{} ({}) successfully added to database", block_height, block_hash_hex
+                );
+                block_nums.remove(0);
+            },
+            Ok(BlockAddResult::OrphanBlock) => {
+                warn!(
+                    target: LOG_TARGET,
+                    "Received orphan block #{} ({}) from peer `{}`", block_height, block_hash_hex, sync_peer.node_id
+                );
+                block_nums.remove(0);
+            },
+            Ok(BlockAddResult::ChainReorg(removed, added)) => {
+                warn!(
+                    target: LOG_TARGET,
+                    "Block #{} ({}) caused a reorg during block sync. (#removed = {}, #added = {})",
+                    block_height,
+                    block_hash_hex,
+                    removed.len(),
+                    added.len()
+                );
+                block_nums.remove(0);
+            },
+            Ok(BlockAddResult::BlockExists) => {
+                warn!(
+                    target: LOG_TARGET,
+                    "Block #{} ({}) already exists.", block_height, block_hash_hex
+                );
+                block_nums.remove(0);
+            },
+            Err(ChainStorageError::InvalidBlock) => {
+                warn!(
+                    target: LOG_TARGET,
+                    "Invalid block {} received from peer.", block_hash_hex,
+                );
+                debug!(
+                    target: LOG_TARGET,
+                    "Banning peer {} from local node, because they supplied invalid block", sync_peer
+                );
 
                 ban_sync_peer(
                     LOG_TARGET,
