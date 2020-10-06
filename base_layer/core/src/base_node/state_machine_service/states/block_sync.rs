@@ -22,7 +22,7 @@
 use crate::{
     base_node::{
         comms_interface::{BlockEvent, CommsInterfaceError},
-        consts::BASE_NODE_SERVICE_REQUEST_TIMEOUT,
+        consts::FETCH_BLOCKS_SERVICE_REQUEST_TIMEOUT,
         state_machine_service::{
             states::{
                 helpers::{ban_all_sync_peers, ban_sync_peer, request_headers, select_sync_peer},
@@ -45,7 +45,7 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tari_comms::{connectivity::ConnectivityError, peer_manager::PeerManagerError};
 use tari_crypto::tari_utilities::{hex::Hex, Hashable};
@@ -75,6 +75,7 @@ pub struct BlockSyncConfig {
     pub max_add_block_retry_attempts: usize,
     pub header_request_size: usize,
     pub block_request_size: usize,
+    pub fetch_blocks_timeout: Duration,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -116,6 +117,7 @@ impl Default for BlockSyncConfig {
             max_add_block_retry_attempts: MAX_ADD_BLOCK_RETRY_ATTEMPTS,
             header_request_size: HEADER_REQUEST_SIZE,
             block_request_size: BLOCK_REQUEST_SIZE,
+            fetch_blocks_timeout: FETCH_BLOCKS_SERVICE_REQUEST_TIMEOUT,
         }
     }
 }
@@ -341,7 +343,7 @@ async fn synchronize_blocks<B: BlockchainBackend + 'static>(
                     attempts = 0;
                     // if we took less than half the timeout, try doubling the
                     // blocks we request
-                    if timer.elapsed() < BASE_NODE_SERVICE_REQUEST_TIMEOUT / 2 {
+                    if timer.elapsed() < shared.config.block_sync_config.fetch_blocks_timeout / 2 {
                         block_window = blocks_synced * 2;
                     } else {
                         // Otherwise, request the same number of blocks. `request_and_add_blocks` automatically
