@@ -6,10 +6,11 @@ const {getFreePort} = require("./util");
 const dateFormat = require('dateformat');
 
 class BaseNodeProcess {
-    constructor(name, nodeFile) {
+    constructor(name, options, nodeFile) {
         this.name = name;
         this.nodeFile = nodeFile;
-        // this.port = getFreePort(19000, 25000);
+        this.options = options;
+        // this.port = getFreePort(19000, 20000);
         // this.grpcPort = getFreePort(50000, 51000);
         // this.name = `Basenode${this.port}-${name}`;
         // this.nodeFile = nodeFile || "newnode_id.json";
@@ -113,8 +114,20 @@ class BaseNodeProcess {
 
         }
 
-        return envs;
+
+
+        return { ...envs, ...this.mapEnvs(this.options || {}) } ;
     }
+
+    mapEnvs(options) {
+        let res = {};
+        if (options.pruningHorizon) {
+            res.TARI_BASE_NODE__LOCALNET__PRUNING_HORIZON=options.pruningHorizon;
+        }
+        return res;
+    }
+
+
 
     //
     // runSync(cmd, args) {
