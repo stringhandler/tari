@@ -109,9 +109,6 @@ fn main_inner() -> Result<(), ExitCodes> {
             .map_err(|e| ExitCodes::WalletError(format!("Could not delete identity file {}", e)))?;
     }
 
-    // get command line password if provided
-    let arg_password = bootstrap.password.clone();
-
     let mut shutdown = Shutdown::new();
     let shutdown_signal = shutdown.to_signal();
 
