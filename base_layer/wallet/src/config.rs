@@ -66,7 +66,7 @@ impl WalletConfig {
             rate_limit: rate_limit.unwrap_or(50),
             network,
             base_node_service_config: base_node_service_config.unwrap_or_default(),
-            scan_for_utxo_interval: scan_for_utxo_interval.unwrap_or_else(|| Duration::from_secs(43200)),
+            scan_for_utxo_interval: scan_for_utxo_interval.unwrap_or_else(|| Duration::from_secs(300)),
         }
     }
 }

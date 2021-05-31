@@ -118,6 +118,8 @@ base_node_query_timeout = 120
 # use of store and forward or using any combination of these.
 # (options: "DirectOnly", "StoreAndForwardOnly", DirectAndStoreAndForward". default: "DirectAndStoreAndForward").
 #transaction_routing_mechanism = "DirectAndStoreAndForward"
+# The time interval at which the wallet scans utxos for one sided payments
+scan_for_utxo_interval = 300
 
 # When running the console wallet in command mode, use these values to determine what "stage" and timeout to wait
 # for sent transactions.
