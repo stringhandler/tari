@@ -283,9 +283,9 @@ where B: BlockchainBackend
     }
 
     // Fetch the utxo
-    pub fn fetch_utxo(&self, hash: HashOutput) -> Result<Option<TransactionOutput>, ChainStorageError> {
+    pub fn fetch_utxo(&self, hash: HashOutput) -> Result<TransactionOutput, ChainStorageError> {
         let db = self.db_read_access()?;
-        Ok(db.fetch_output(&hash)?.map(|(out, _index, _)| out))
+        Ok(db.fetch_output(&hash)?.0)
     }
 
     /// Return a list of matching utxos, with each being `None` if not found. If found, the transaction
@@ -311,7 +311,7 @@ where B: BlockchainBackend
 
         let mut result = Vec::with_capacity(hashes.len());
         for hash in hashes {
-            let output = db.fetch_output(&hash)?;
+            let output = db.fetch_output(&hash).optional()?;
             result.push(output.map(|(out, mmr_index, _)| (out, data.deleted().contains(mmr_index))));
         }
         Ok(result)
@@ -1204,20 +1204,12 @@ fn fetch_block_with_utxo<T: BlockchainBackend>(
     db: &T,
     commitment: Commitment,
 ) -> Result<Option<HistoricalBlock>, ChainStorageError> {
-    match db.fetch_output(&commitment.to_vec()) {
-        Ok(output) => match output {
-            Some((_output, leaf, _height)) => {
-                let header = db.fetch_header_containing_utxo_mmr(leaf as u64)?;
-                fetch_block_by_hash(db, header.hash().to_owned())
+         match db.fetch_output(&commitment.to_vec()).optional()? {
+            Some((_output, _leaf, height)) => {
+                Ok(Some(fetch_block(db, height)?))
             },
             None => Ok(None),
-        },
-        Err(_) => Err(ChainStorageError::ValueNotFound {
-            entity: "Output".to_string(),
-            field: "Commitment".to_string(),
-            value: commitment.to_hex(),
-        }),
-    }
+        }
 }
 
 fn fetch_block_by_hash<T: BlockchainBackend>(

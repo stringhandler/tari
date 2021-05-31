@@ -826,10 +826,8 @@ impl LMDBDatabase {
         }
 
         for input in inputs {
-            total_utxo_sum = &total_utxo_sum - &input.commitment;
-            let index = self
-                .fetch_mmr_leaf_index(&**txn, MmrTree::Utxo, &input.hash())?
-                .ok_or(ChainStorageError::UnspendableInput)?;
+            let (spending_output, index, _block_height) = self.fetch_output_with_txn(txn, input.output_hash())?;
+            total_utxo_sum = &total_utxo_sum - &spending_output.commitment;
             if !output_mmr.delete(index) {
                 return Err(ChainStorageError::InvalidOperation(format!(
                     "Could not delete index {} from the output MMR",
@@ -839,7 +837,7 @@ impl LMDBDatabase {
             trace!(
                 target: LOG_TARGET,
                 "Inserting input `{}`",
-                to_hex(&input.commitment.as_bytes())
+                to_hex(&input.output_hash().as_bytes())
             );
             self.insert_input(txn, block_hash.clone(), input, index)?;
         }
@@ -1000,6 +998,49 @@ impl LMDBDatabase {
                 Ok(lmdb_get::<_, (u32, String)>(txn, &self.txos_hash_to_index_db, hash)?.map(|(index, _)| index))
             },
             _ => unimplemented!(),
+        }
+    }
+
+
+    /// Fetch an output inside of the scope of a db transaction.
+    /// Returns the output, mmr index and block it was mined in
+    fn fetch_output_with_txn(
+        &self, txn: &ConstTransaction<'_>,
+        output_hash: &HashOutput
+    ) -> Result<(TransactionOutput, u32, u64), ChainStorageError> {
+        if let Some((index, key)) =
+        lmdb_get::<_, (u32, String)>(&txn, &self.txos_hash_to_index_db, output_hash.as_slice())?
+        {
+            debug!(
+                target: LOG_TARGET,
+                "Fetch output: {} Found ({}, {})",
+                output_hash.to_hex(),
+                index,
+                key
+            );
+            if let Some(output) = lmdb_get::<_, TransactionOutputRowData>(&txn, &self.utxos_db, key.as_str())? {
+                if output.output.is_none() {
+                    error!(
+                        target: LOG_TARGET,
+                        "Tried to fetch pruned output: {} ({}, {})",
+                        output_hash.to_hex(),
+                        index,
+                        key
+                    );
+                    Err(ChainStorageError::InvalidOperation(format!("Tried to retrieve an output that has been pruned: {}", key)))
+                }else {
+                    Ok((output.output.unwrap(), output.mmr_position, output.mined_height))
+                }
+            } else {
+                Err(ChainStorageError::ValueNotFound {entity: "Output".into(), field: "key".into(), value:key })
+            }
+        } else {
+            debug!(
+                target: LOG_TARGET,
+                "Fetch output: {} NOT found in index",
+                output_hash.to_hex()
+            );
+            Err(ChainStorageError::ValueNotFound {entity: "Output".into(), field: "hash".into(), value: output_hash.to_hex()})
         }
     }
 
@@ -1575,42 +1616,10 @@ impl BlockchainBackend for LMDBDatabase {
     fn fetch_output(
         &self,
         output_hash: &HashOutput,
-    ) -> Result<Option<(TransactionOutput, u32, u64)>, ChainStorageError> {
+    ) -> Result<(TransactionOutput, u32, u64), ChainStorageError> {
         debug!(target: LOG_TARGET, "Fetch output: {}", output_hash.to_hex());
         let txn = self.read_transaction()?;
-        if let Some((index, key)) =
-            lmdb_get::<_, (u32, String)>(&txn, &self.txos_hash_to_index_db, output_hash.as_slice())?
-        {
-            debug!(
-                target: LOG_TARGET,
-                "Fetch output: {} Found ({}, {})",
-                output_hash.to_hex(),
-                index,
-                key
-            );
-            if let Some(output) = lmdb_get::<_, TransactionOutputRowData>(&txn, &self.utxos_db, key.as_str())? {
-                if output.output.is_none() {
-                    error!(
-                        target: LOG_TARGET,
-                        "Tried to fetch pruned output: {} ({}, {})",
-                        output_hash.to_hex(),
-                        index,
-                        key
-                    );
-                    unimplemented!("Output has been pruned");
-                }
-                Ok(Some((output.output.unwrap(), output.mmr_position, output.mined_height)))
-            } else {
-                Ok(None)
-            }
-        } else {
-            debug!(
-                target: LOG_TARGET,
-                "Fetch output: {} NOT found in index",
-                output_hash.to_hex()
-            );
-            Ok(None)
-        }
+        self.fetch_output_with_txn(&txn, output_hash)
     }
 
     fn fetch_outputs_in_block(&self, header_hash: &HashOutput) -> Result<Vec<PrunedOutput>, ChainStorageError> {

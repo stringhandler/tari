@@ -43,6 +43,7 @@ use tari_crypto::{
     commitment::HomomorphicCommitmentFactory,
     tari_utilities::{hash::Hashable, hex::Hex},
 };
+use crate::transactions::types::PublicKey;
 
 pub const LOG_TARGET: &str = "c::val::block_validators";
 
@@ -163,7 +164,7 @@ fn check_inputs_are_utxos<B: BlockchainBackend>(block: &Block, db: &B) -> Result
         .ok_or(ValidationError::PreviousHashNotFound)?;
 
     for input in block.body.inputs() {
-        if let Some((_, index, _height)) = db.fetch_output(&input.hash())? {
+        if let Some((_, index, _height)) = db.fetch_output(&input.hash()).optional()? {
             if data.deleted().contains(index) {
                 warn!(
                     target: LOG_TARGET,
@@ -286,22 +287,26 @@ impl<B: BlockchainBackend> BlockValidator<B> {
     }
 
     /// This function checks that all inputs in the blocks are valid UTXO's to be spend
-    fn check_inputs(&self, block: &Block) -> Result<(), ValidationError> {
+    fn check_inputs_and_calculate_totatl_offset(&self, block: &Block, backend: &B) -> Result<PublicKey, ValidationError> {
         let inputs = block.body.inputs();
+        let mut total_offset = PublicKey::default();
         for (i, input) in inputs.iter().enumerate() {
             // Check for duplicates and/or incorrect sorting
             if i > 0 && input <= &inputs[i - 1] {
                 return Err(ValidationError::UnsortedOrDuplicateInput);
             }
+            let output = backend.fetch_output(input.output_hash())?;
 
             // Check maturity
-            if input.features.maturity > block.header.height {
+            if output.features.maturity > block.header.height {
                 warn!(
                     target: LOG_TARGET,
                     "Input found that has not yet matured to spending height: {}", input
                 );
                 return Err(TransactionError::InputMaturity.into());
             }
+
+                total_offset = total_offset + input.run_and_verify_script()?;
         }
         Ok(())
     }
@@ -440,7 +445,7 @@ impl<B: BlockchainBackend> CandidateBlockBodyValidation<B> for BlockValidator<B>
         check_block_weight(block, &constants)?;
         trace!(target: LOG_TARGET, "SV - Block weight is ok for {} ", &block_id);
 
-        self.check_inputs(block)?;
+        self.check_inputs(block, backend)?;
         self.check_outputs(block)?;
 
         check_accounting_balance(block, &self.rules, &self.factories)?;

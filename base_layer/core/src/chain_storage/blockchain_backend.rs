@@ -105,7 +105,7 @@ pub trait BlockchainBackend: Send + Sync {
     fn fetch_output(
         &self,
         output_hash: &HashOutput,
-    ) -> Result<Option<(TransactionOutput, u32, u64)>, ChainStorageError>;
+    ) -> Result<(TransactionOutput, u32, u64), ChainStorageError>;
 
     /// Fetch all outputs in a block
     fn fetch_outputs_in_block(&self, header_hash: &HashOutput) -> Result<Vec<PrunedOutput>, ChainStorageError>;

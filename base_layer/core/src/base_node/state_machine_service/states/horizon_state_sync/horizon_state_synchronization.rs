@@ -548,7 +548,7 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
             for u in utxos {
                 match u {
                     PrunedOutput::NotPruned { output } => {
-                        utxo_sum = &output.commitment + &utxo_sum;
+                        utxo_sum = output.commitment() + &utxo_sum;
                     },
                     _ => {
                         prune_counter += 1;

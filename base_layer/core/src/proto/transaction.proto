@@ -30,20 +30,12 @@ message TransactionKernel {
 //
 // Primarily a reference to an output being spent by the transaction.
 message TransactionInput {
-    // The features of the output being spent. We will check maturity for all outputs.
-    OutputFeatures features = 1;
-    // The commitment referencing the output being spent.
-    Commitment commitment = 2;
-    // The serialised script
-    bytes script = 3;
     // The script input data, if any
     bytes input_data = 4;
-    // The block height that the UTXO was mined
-    uint64 height = 5;
     // A signature with k_s, signing the script, input data, and mined height
     Signature script_signature = 6;
-    // The offset pubkey, K_O
-    bytes script_offset_public_key = 7;
+    //  The hash of the output that is being referenced
+    bytes output_hash = 8;
 }
 
 // Output for a transaction, defining the new ownership of coins that are being transferred. The commitment is a

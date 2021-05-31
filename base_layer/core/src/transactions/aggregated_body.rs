@@ -377,13 +377,8 @@ impl AggregateBody {
     }
 
     /// this will validate the script offset of the aggregate body.
-    fn validate_script_offset(&self, script_offset: PublicKey) -> Result<(), TransactionError> {
-        trace!(target: LOG_TARGET, "Checking script offset");
-        // lets count up the input script public keys
-        let mut input_keys = PublicKey::default();
-        for input in &self.inputs {
-            input_keys = input_keys + input.run_and_verify_script()?;
-        }
+    fn validate_script_offset(&self, script_offset: PublicKey, input_total_script_offset: PublicKey) -> Result<(), TransactionError> {
+
 
         // Now lets gather the output public keys and hashes.
         let mut output_keys = PublicKey::default();
@@ -396,7 +391,7 @@ impl AggregateBody {
                         output.script_offset_public_key.clone();
             }
         }
-        let lhs = input_keys - output_keys;
+        let lhs = input_total_script_offset - output_keys;
         if lhs != script_offset {
             return Err(TransactionError::ScriptOffset);
         }
