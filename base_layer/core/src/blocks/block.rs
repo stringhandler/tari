@@ -106,11 +106,6 @@ impl Block {
         Ok(())
     }
 
-    /// Checks that all STXO rules (maturity etc) are followed
-    pub fn check_stxo_rules(&self) -> Result<(), BlockValidationError> {
-        self.body.check_stxo_rules(self.header.height)?;
-        Ok(())
-    }
 
     /// Destroys the block and returns the pieces of the block: header, inputs, outputs and kernels
     pub fn dissolve(

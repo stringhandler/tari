@@ -342,7 +342,7 @@ impl LMDBDatabase {
         mmr_position: u32,
     ) -> Result<(), ChainStorageError> {
         let output_hash = output.hash();
-        let proof_hash = output.proof.hash();
+        let proof_hash = output.proof().hash();
         let key = format!("{}-{:010}", header_hash.to_hex(), mmr_position,);
         lmdb_insert(
             txn,
@@ -808,13 +808,13 @@ impl LMDBDatabase {
         let mut output_mmr = MutableMmr::<HashDigest, _>::new(pruned_output_set, deleted.deleted)?;
         let mut proof_mmr = MerkleMountainRange::<HashDigest, _>::new(pruned_proof_set);
         for output in outputs {
-            total_utxo_sum = &total_utxo_sum + &output.commitment;
+            total_utxo_sum = &total_utxo_sum + &output.commitment();
             output_mmr.push(output.hash())?;
             proof_mmr.push(output.proof().hash())?;
             trace!(
                 target: LOG_TARGET,
                 "Inserting output `{}`",
-                to_hex(&output.commitment.as_bytes())
+                to_hex(&output.commitment().as_bytes())
             );
             self.insert_output(
                 txn,
@@ -827,7 +827,7 @@ impl LMDBDatabase {
 
         for input in inputs {
             let (spending_output, index, _block_height) = self.fetch_output_with_txn(txn, input.output_hash())?;
-            total_utxo_sum = &total_utxo_sum - &spending_output.commitment;
+            total_utxo_sum = &total_utxo_sum - &spending_output.commitment();
             if !output_mmr.delete(index) {
                 return Err(ChainStorageError::InvalidOperation(format!(
                     "Could not delete index {} from the output MMR",

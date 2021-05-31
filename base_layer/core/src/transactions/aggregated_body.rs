@@ -281,19 +281,6 @@ impl AggregateBody {
         Ok(())
     }
 
-    /// This function will check all stxo to ensure that feature flags where followed
-    pub fn check_stxo_rules(&self, height: u64) -> Result<(), TransactionError> {
-        for input in self.inputs() {
-            if input.features.maturity > height {
-                warn!(
-                    target: LOG_TARGET,
-                    "Input found that has not yet matured to spending height: {}", input
-                );
-                return Err(TransactionError::InputMaturity);
-            }
-        }
-        Ok(())
-    }
 
     /// Validate this transaction by checking the following:
     /// 1. The sum of inputs, outputs and fees equal the (public excess value + offset)
@@ -306,6 +293,7 @@ impl AggregateBody {
     pub fn validate_internal_consistency(
         &self,
         tx_offset: &BlindingFactor,
+        input_total_public_script_input: &PublicKey,
         script_offset: &BlindingFactor,
         total_reward: MicroTari,
         factories: &CryptoFactories,
@@ -317,18 +305,11 @@ impl AggregateBody {
         self.validate_kernel_sum(total_offset, &factories.commitment)?;
 
         self.validate_range_proofs(&factories.range_proof)?;
-        self.validate_script_offset(script_offset_g)
+        self.validate_script_offset(script_offset_g, input_total_public_script_input)
     }
 
     pub fn dissolve(self) -> (Vec<TransactionInput>, Vec<TransactionOutput>, Vec<TransactionKernel>) {
         (self.inputs, self.outputs, self.kernels)
-    }
-
-    /// Calculate the sum of the outputs - inputs
-    fn sum_commitments(&self) -> Commitment {
-        let sum_inputs = &self.inputs.iter().map(|i| &i.commitment).sum::<Commitment>();
-        let sum_outputs = &self.outputs.iter().map(|o| &o.commitment).sum::<Commitment>();
-        sum_outputs - sum_inputs
     }
 
     /// Calculate the sum of the kernels, taking into account the provided offset, and their constituent fees
@@ -377,7 +358,7 @@ impl AggregateBody {
     }
 
     /// this will validate the script offset of the aggregate body.
-    fn validate_script_offset(&self, script_offset: PublicKey, input_total_script_offset: PublicKey) -> Result<(), TransactionError> {
+    fn validate_script_offset(&self, script_offset: PublicKey, input_total_script_offset: &PublicKey) -> Result<(), TransactionError> {
 
 
         // Now lets gather the output public keys and hashes.

@@ -43,6 +43,7 @@ use crate::{
 };
 use log::*;
 use tari_crypto::tari_utilities::{epoch_time::EpochTime, hash::Hashable, hex::Hex};
+use crate::transactions::types::PublicKey;
 
 pub const LOG_TARGET: &str = "c::val::helpers";
 
@@ -201,6 +202,7 @@ pub fn check_accounting_balance(
     block: &Block,
     rules: &ConsensusManager,
     factories: &CryptoFactories,
+    input_total_script_offset: &PublicKey,
 ) -> Result<(), ValidationError> {
     if block.header.height == 0 {
         // Gen block does not need to be checked for this.
@@ -211,7 +213,7 @@ pub fn check_accounting_balance(
     let total_coinbase = rules.calculate_coinbase_and_fees(block);
     block
         .body
-        .validate_internal_consistency(&offset, &script_offset, total_coinbase, factories)
+        .validate_internal_consistency(&offset, input_total_script_offset, &script_offset, total_coinbase, factories)
         .map_err(|err| {
             warn!(
                 target: LOG_TARGET,

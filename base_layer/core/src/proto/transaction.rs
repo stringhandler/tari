@@ -96,16 +96,8 @@ impl TryFrom<proto::types::TransactionInput> for TransactionInput {
     type Error = String;
 
     fn try_from(input: proto::types::TransactionInput) -> Result<Self, Self::Error> {
-        let features = input
-            .features
-            .map(TryInto::try_into)
-            .ok_or_else(|| "transaction output features not provided".to_string())??;
-
-        let commitment = input
-            .commitment
-            .map(|commit| Commitment::from_bytes(&commit.data))
-            .ok_or_else(|| "Transaction output commitment not provided".to_string())?
-            .map_err(|err| err.to_string())?;
+        let output_hash = input
+            .output_hash;
 
         let script_signature = input
             .script_signature
@@ -113,17 +105,10 @@ impl TryFrom<proto::types::TransactionInput> for TransactionInput {
             .try_into()
             .map_err(|err: ByteArrayError| err.to_string())?;
 
-        let script_offset_public_key =
-            PublicKey::from_bytes(input.script_offset_public_key.as_bytes()).map_err(|err| format!("{:?}", err))?;
-
         Ok(Self {
-            features,
-            commitment,
-            script: TariScript::from_bytes(input.script.as_slice()).map_err(|err| format!("{:?}", err))?,
+            output_hash,
             input_data: ExecutionStack::from_bytes(input.input_data.as_slice()).map_err(|err| format!("{:?}", err))?,
-            height: input.height,
             script_signature,
-            script_offset_public_key,
         })
     }
 }
@@ -131,13 +116,9 @@ impl TryFrom<proto::types::TransactionInput> for TransactionInput {
 impl From<TransactionInput> for proto::types::TransactionInput {
     fn from(input: TransactionInput) -> Self {
         Self {
-            features: Some(input.features.into()),
-            commitment: Some(input.commitment.into()),
-            script: input.script.as_bytes(),
-            input_data: input.input_data.as_bytes(),
-            height: input.height,
+            output_hash: input.output_hash().to_vec(),
+            input_data: input.input_data().as_bytes(),
             script_signature: Some(input.script_signature.into()),
-            script_offset_public_key: input.script_offset_public_key.as_bytes().to_vec(),
         }
     }
 }

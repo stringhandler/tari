@@ -380,7 +380,7 @@ pub struct TransactionInput {
     /// The script input data, if any
     input_data: ExecutionStack,
     /// A signature with k_s, signing the script, input data, and mined height
-    script_signature: Signature,
+    pub script_signature: Signature,
 }
 
 /// An input for a transaction that spends an existing output
@@ -401,6 +401,11 @@ impl TransactionInput {
     /// The hash of the output that this input is spending
     pub fn output_hash(&self) -> &HashOutput {
         &self.output_hash
+    }
+
+
+    pub fn input_data(&self) -> &ExecutionStack {
+        &self.input_data
     }
 
     /// This will run the script contained in the TransactionInput, returning either a script error or the resulting
@@ -487,15 +492,15 @@ impl Ord for TransactionInput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransactionOutput {
     /// Options for an output's structure or use
-    features: OutputFeatures,
+    pub features: OutputFeatures,
     /// The homomorphic commitment representing the output amount
-    commitment: Commitment,
+    pub commitment: Commitment,
     /// A proof that the commitment is in the right range
     pub proof: RangeProof,
     /// The script that will be executed when spending this output
     pub script: TariScript,
     /// Tari script offset pubkey, K_O
-    script_offset_public_key: PublicKey,
+    pub script_offset_public_key: PublicKey,
 }
 
 /// An output for a transaction, includes a range proof and Tari script metadata
@@ -525,6 +530,11 @@ impl TransactionOutput {
     /// Accessor method for the range proof contained in an output
     pub fn proof(&self) -> &RangeProof {
         &self.proof
+    }
+
+    /// Options for an output's structure or use
+    pub fn features(&self) -> &OutputFeatures {
+        &self.features
     }
 
     /// Verify that range proof is valid

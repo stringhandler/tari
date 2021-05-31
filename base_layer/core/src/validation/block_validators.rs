@@ -22,7 +22,7 @@
 use crate::{
     blocks::{Block, BlockValidationError},
     chain_storage,
-    chain_storage::{BlockchainBackend, ChainBlock, MmrTree},
+    chain_storage::{BlockchainBackend, ChainBlock, MmrTree, Optional},
     consensus::ConsensusManager,
     transactions::{
         aggregated_body::AggregateBody,
@@ -64,10 +64,8 @@ impl OrphanValidation for OrphanBlockValidator {
     /// The consensus checks that are done (in order of cheapest to verify to most expensive):
     /// 1. Is the block weight of the block under the prescribed limit?
     /// 1. Does it contain only unique inputs and outputs?
-    /// 1. Where all the rules for the spent outputs followed?
     /// 1. Was cut through applied in the block?
     /// 1. Is there precisely one Coinbase output and is it correctly defined with the correct amount?
-    /// 1. Is the accounting correct?
     fn validate(&self, block: &Block) -> Result<(), ValidationError> {
         if block.header.height == 0 {
             warn!(target: LOG_TARGET, "Attempt to validate genesis block");
@@ -96,13 +94,10 @@ impl OrphanValidation for OrphanBlockValidator {
             &block_id
         );
 
-        // Check that the inputs are are allowed to be spent
-        block.check_stxo_rules()?;
-        trace!(target: LOG_TARGET, "SV - Output constraints are ok for {} ", &block_id);
+
         check_coinbase_output(block, &self.rules, &self.factories)?;
         trace!(target: LOG_TARGET, "SV - Coinbase output is ok for {} ", &block_id);
-        check_accounting_balance(block, &self.rules, &self.factories)?;
-        trace!(target: LOG_TARGET, "SV - accounting balance correct for {}", &block_id);
+
         debug!(
             target: LOG_TARGET,
             "{} has PASSED stateless VALIDATION check.", &block_id
@@ -116,8 +111,16 @@ impl OrphanValidation for OrphanBlockValidator {
 
 /// This validator checks whether a block satisfies *all* consensus rules. If a block passes this validator, it is the
 /// next block on the blockchain.
-#[derive(Default)]
-pub struct BodyOnlyValidator {}
+pub struct BodyOnlyValidator {
+    rules: ConsensusManager,
+    factories: CryptoFactories,
+}
+
+impl BodyOnlyValidator {
+    pub fn new(rules: ConsensusManager, factories: CryptoFactories) -> Self {
+        Self { rules, factories }
+    }
+}
 
 impl<B: BlockchainBackend> PostOrphanBodyValidation<B> for BodyOnlyValidator {
     /// The consensus checks that are done (in order of cheapest to verify to most expensive):
@@ -127,7 +130,7 @@ impl<B: BlockchainBackend> PostOrphanBodyValidation<B> for BodyOnlyValidator {
     /// 1. Are the block header MMR roots valid?
     fn validate_body_for_valid_orphan(&self, block: &ChainBlock, backend: &B) -> Result<(), ValidationError> {
         let block_id = format!("block #{} ({})", block.header().height, block.hash().to_hex());
-        check_inputs_are_utxos(&block.block(), backend)?;
+        let script_offset = check_inputs_and_calculate_total_offset(&block.block(), backend)?;
         check_not_duplicate_txos(&block.block(), backend)?;
         trace!(
             target: LOG_TARGET,
@@ -135,6 +138,8 @@ impl<B: BlockchainBackend> PostOrphanBodyValidation<B> for BodyOnlyValidator {
             block_id
         );
         check_mmr_roots(block.block(), backend)?;
+
+        check_accounting_balance(block.block(), &self.rules, &self.factories, &script_offset)?;
         trace!(
             target: LOG_TARGET,
             "Block validation: MMR roots are valid for {}",
@@ -157,39 +162,31 @@ fn check_sorting_and_duplicates(body: &AggregateBody) -> Result<(), ValidationEr
     Ok(())
 }
 
-/// This function checks that all inputs in the blocks are valid UTXO's to be spend
-fn check_inputs_are_utxos<B: BlockchainBackend>(block: &Block, db: &B) -> Result<(), ValidationError> {
-    let data = db
-        .fetch_block_accumulated_data(&block.header.prev_hash)?
-        .ok_or(ValidationError::PreviousHashNotFound)?;
 
-    for input in block.body.inputs() {
-        if let Some((_, index, _height)) = db.fetch_output(&input.hash()).optional()? {
-            if data.deleted().contains(index) {
-                warn!(
-                    target: LOG_TARGET,
-                    "Block validation failed due to already spent input: {}", input
-                );
-                return Err(ValidationError::ContainsSTxO);
-            }
-        // TODO Do we keep the height validation?
-        // if height != input.height {
-        //     warn!(
-        //         target: LOG_TARGET,
-        //         "Block validation failed due to input not having correct mined height({}): {}", height, input
-        //     );
-        //     return Err(ValidationError::InvalidMinedHeight);
-        // }
-        } else {
+
+/// This function checks that all inputs in the blocks are valid UTXO's to be spend
+fn check_inputs_and_calculate_total_offset<B: BlockchainBackend>(block: &Block, backend: &B) -> Result<PublicKey, ValidationError> {
+    let inputs = block.body.inputs();
+    let mut total_offset = PublicKey::default();
+    for (i, input) in inputs.iter().enumerate() {
+        // Check for duplicates and/or incorrect sorting
+        if i > 0 && input <= &inputs[i - 1] {
+            return Err(ValidationError::UnsortedOrDuplicateInput);
+        }
+        let (output, _, _) = backend.fetch_output(input.output_hash())?;
+
+        // Check maturity
+        if output.features().maturity > block.header.height {
             warn!(
                 target: LOG_TARGET,
-                "Block validation failed because the block has invalid input: {} which does not exist", input
+                "Input found that has not yet matured to spending height: {}", input
             );
-            return Err(ValidationError::BlockError(BlockValidationError::InvalidInput));
+            return Err(TransactionError::InputMaturity.into());
         }
-    }
 
-    Ok(())
+        total_offset = total_offset + input.run_and_verify_script(&output)?;
+    }
+    Ok(total_offset)
 }
 
 // This function checks that the inputs and outputs do not exist in the STxO set.
@@ -286,36 +283,12 @@ impl<B: BlockchainBackend> BlockValidator<B> {
         }
     }
 
-    /// This function checks that all inputs in the blocks are valid UTXO's to be spend
-    fn check_inputs_and_calculate_totatl_offset(&self, block: &Block, backend: &B) -> Result<PublicKey, ValidationError> {
-        let inputs = block.body.inputs();
-        let mut total_offset = PublicKey::default();
-        for (i, input) in inputs.iter().enumerate() {
-            // Check for duplicates and/or incorrect sorting
-            if i > 0 && input <= &inputs[i - 1] {
-                return Err(ValidationError::UnsortedOrDuplicateInput);
-            }
-            let output = backend.fetch_output(input.output_hash())?;
-
-            // Check maturity
-            if output.features.maturity > block.header.height {
-                warn!(
-                    target: LOG_TARGET,
-                    "Input found that has not yet matured to spending height: {}", input
-                );
-                return Err(TransactionError::InputMaturity.into());
-            }
-
-                total_offset = total_offset + input.run_and_verify_script()?;
-        }
-        Ok(())
-    }
 
     fn check_outputs(&self, block: &Block) -> Result<(), ValidationError> {
         let outputs = block.body.outputs();
         let mut coinbase_output = None;
         for (j, output) in outputs.iter().enumerate() {
-            if output.features.flags.contains(OutputFlags::COINBASE_OUTPUT) {
+            if output.features().flags.contains(OutputFlags::COINBASE_OUTPUT) {
                 if coinbase_output.is_some() {
                     return Err(ValidationError::TransactionError(TransactionError::MoreThanOneCoinbase));
                 }
@@ -367,7 +340,7 @@ impl<B: BlockchainBackend> BlockValidator<B> {
                 .factories
                 .commitment
                 .commit_value(&Default::default(), reward.into());
-        if rhs != coinbase_output.commitment {
+        if &rhs != coinbase_output.commitment() {
             warn!(
                 target: LOG_TARGET,
                 "Coinbase {} amount validation failed", coinbase_output
@@ -445,10 +418,10 @@ impl<B: BlockchainBackend> CandidateBlockBodyValidation<B> for BlockValidator<B>
         check_block_weight(block, &constants)?;
         trace!(target: LOG_TARGET, "SV - Block weight is ok for {} ", &block_id);
 
-        self.check_inputs(block, backend)?;
+        let total_script_offset  = check_inputs_and_calculate_total_offset(block, backend)?;
         self.check_outputs(block)?;
 
-        check_accounting_balance(block, &self.rules, &self.factories)?;
+        check_accounting_balance(block, &self.rules, &self.factories, &total_script_offset)?;
         trace!(target: LOG_TARGET, "SV - accounting balance correct for {}", &block_id);
         debug!(
             target: LOG_TARGET,

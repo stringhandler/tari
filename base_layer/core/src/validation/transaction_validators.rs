@@ -28,6 +28,7 @@ use crate::{
 };
 use log::*;
 use tari_crypto::tari_utilities::hash::Hashable;
+use crate::chain_storage::Optional;
 
 pub const LOG_TARGET: &str = "c::val::transaction_validators";
 
@@ -132,7 +133,7 @@ fn verify_not_stxos<B: BlockchainBackend>(tx: &Transaction, db: &B) -> Result<()
             )
         });
     for input in tx.body.inputs() {
-        if let Some((_, index, _height)) = db.fetch_output(&input.hash())? {
+        if let Some((_, index, _height)) = db.fetch_output(&input.hash()).optional()? {
             if data.deleted().contains(index) {
                 warn!(
                     target: LOG_TARGET,
