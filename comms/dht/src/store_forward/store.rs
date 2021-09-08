@@ -221,7 +221,7 @@ where S: Service<DecryptedDhtMessage, Response = (), Error = PipelineError> + Se
 
     async fn get_storage_priority(&self, message: &DecryptedDhtMessage) -> SafResult<Option<StoredMessagePriority>> {
         let log_not_eligible = |reason: &str| {
-            debug!(
+            trace!(
                 target: LOG_TARGET,
                 "Message {} from peer '{}' not eligible for SAF storage because {} (Trace: {})",
                 message.tag,
@@ -355,7 +355,7 @@ where S: Service<DecryptedDhtMessage, Response = (), Error = PipelineError> + Se
         message: &DecryptedDhtMessage,
     ) -> SafResult<Option<StoredMessagePriority>> {
         let log_not_eligible = |reason: &str| {
-            debug!(
+            trace!(
                 target: LOG_TARGET,
                 "Message {} from peer '{}' not eligible for SAF storage because {} (Trace: {})",
                 message.tag,

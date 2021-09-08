@@ -317,7 +317,6 @@ impl StoreAndForwardService {
     async fn handle_connectivity_event(&mut self, event: &ConnectivityEvent) -> SafResult<()> {
         use ConnectivityEvent::*;
 
-        #[allow(clippy::single_match)]
         match event {
             PeerConnected(conn) => {
                 if !self.config.saf_auto_request {

@@ -663,6 +663,10 @@ impl ConnectivityManagerActor {
         use ConnectionStatus::*;
         match (old_status, new_status) {
             (_, Connected) => {
+                debug!(
+                    target: LOG_TARGET,
+                    "Connection status for peer {} changed from {} to {}", node_id, old_status, new_status
+                );
                 self.mark_peer_succeeded(node_id.clone());
                 match self.pool.get_connection(&node_id).cloned() {
                     Some(conn) => {

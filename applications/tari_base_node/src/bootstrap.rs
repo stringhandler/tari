@@ -251,6 +251,7 @@ where B: BlockchainBackend + 'static
                 flood_ban_max_msg_count: self.config.flood_ban_max_msg_count,
                 saf_msg_validity: self.config.saf_expiry_duration,
                 dedup_cache_capacity: self.config.dedup_cache_capacity,
+                saf_auto_request: false, // Base nodes don't need SAF
                 ..Default::default()
             },
             allow_test_addresses: self.config.allow_test_addresses,

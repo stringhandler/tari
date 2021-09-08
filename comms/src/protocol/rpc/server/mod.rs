@@ -68,7 +68,7 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tower::Service;
 use tower_make::MakeService;
-use tracing::{debug, error, instrument, span, trace, warn, Instrument, Level};
+use tracing::{debug, error, instrument, span, warn, Instrument, Level};
 
 const LOG_TARGET: &str = "comms::rpc";
 
@@ -420,8 +420,18 @@ where
     async fn run(&mut self) -> Result<(), RpcServerError> {
         while let Some(result) = self.framed.next().await {
             let start = Instant::now();
-            if let Err(err) = self.handle(result?.freeze()).await {
+            let r = match result {
+                Ok(r) => r,
+                Err(err) => {
+                    error!(target: LOG_TARGET, "Error during RPC request read:{}", err);
+                    self.framed.close().await?;
+                    return Err(err.into());
+                },
+            };
+            if let Err(err) = self.handle(r.freeze()).await {
                 self.framed.close().await?;
+
+                error!(target: LOG_TARGET, "Error during RPC request:{}", err);
                 return Err(err);
             }
             let elapsed = start.elapsed();
@@ -550,7 +560,7 @@ where
                         Ok(Some(msg)) => {
                             let resp = match msg {
                                 Ok(msg) => {
-                                    trace!(target: LOG_TARGET, "Sending body len = {}", msg.len());
+                                    debug!(target: LOG_TARGET, "Sending body len = {}", msg.len());
                                     let mut flags = RpcMessageFlags::empty();
                                     if msg.is_finished() {
                                         flags |= RpcMessageFlags::FIN;
@@ -652,7 +662,7 @@ async fn log_timing<R, F: Future<Output = R>>(request_id: u32, tag: &str, fut: F
     let span = span!(Level::TRACE, "rpc::internal::timing::{}::{}", request_id, tag);
     let ret = fut.instrument(span).await;
     let elapsed = t.elapsed();
-    trace!(
+    debug!(
         target: LOG_TARGET,
         "RPC TIMING(REQ_ID={}): '{}' took {:.2}s{}",
         request_id,
