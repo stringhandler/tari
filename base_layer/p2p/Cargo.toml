@@ -55,7 +55,7 @@ features = ["console_appender", "file_appender", "file", "yaml_format"]
 default-features = false
 
 [build-dependencies]
-tari_common = { version = "^0.25", path = "../../common", features = ["build"] }
+tari_build= { path = "../../infrastructure/build" }
 
 [features]
 test-mocks = []

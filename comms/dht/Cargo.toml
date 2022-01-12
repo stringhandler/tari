@@ -56,7 +56,7 @@ petgraph = "0.5.1"
 clap = "2.33.0"
 
 [build-dependencies]
-tari_common = { version = "^0.25", path = "../../common" }
+tari_build = {  path = "../../infrastructure/build" }
 
 [features]
 test-mocks = []

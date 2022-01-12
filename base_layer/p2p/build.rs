@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 fn main() {
-    tari_common::build::ProtobufCompiler::new()
+    tari_build::ProtobufCompiler::new()
         .proto_paths(&["src/proto"])
         .emit_rerun_if_changed_directives()
         .compile()

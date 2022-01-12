@@ -10,4 +10,4 @@ prost = "0.9"
 prost-types = "0.9"
 
 [build-dependencies]
-tari_common = { path = "../../common", features = ["build"] }
+tari_build = { path = "../../infrastructure/build" }

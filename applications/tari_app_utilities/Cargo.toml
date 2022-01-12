@@ -24,4 +24,4 @@ structopt = { version = "0.3.13", default_features = false }
 thiserror = "^1.0.26"
 
 [build-dependencies]
-tari_common = { path = "../../common", features = ["build", "static-application-info"] }
+tari_build = { path = "../../infrastructure/build" }

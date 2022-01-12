@@ -4,14 +4,9 @@ use config::Config;
 use log::{debug, info};
 use multiaddr::{Multiaddr, Protocol};
 
-use crate::{
-    configuration::bootstrap::ApplicationType,
-    dir_utils::default_subdir,
-    ConfigBootstrap,
-    ConfigError,
-    LOG_TARGET,
-};
+use crate::{configuration::bootstrap::ApplicationType, dir_utils::default_subdir, ConfigBootstrap, ConfigError};
 
+const LOG_TARGET: &str = "tari::common::utils";
 //-------------------------------------           Main API functions         --------------------------------------//
 
 pub fn load_configuration(bootstrap: &ConfigBootstrap) -> Result<Config, ConfigError> {
