@@ -7,6 +7,6 @@ edition = "2021"
 sha2 = "0.10.1"
 git2 = "0.13.25"
 prost-build = { version = "0.9.0"}
-anyhow = { version = "1.0"}
+anyhow = { version = "1.0.52"}
 toml = { version = "0.5.8"}
 serde = { version = "1.0.133", features = ["derive"] }
