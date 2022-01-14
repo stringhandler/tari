@@ -19,7 +19,7 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
+
 //! # Global configuration of tari base layer system
 
 use std::{
@@ -63,6 +63,7 @@ const DB_RESIZE_THRESHOLD_MIN_MB: i64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct GlobalConfig {
+    pub common: CommonConfig,
     pub autoupdate_check_interval: Option<Duration>,
     pub autoupdate_dns_hosts: Vec<String>,
     pub autoupdate_hashes_url: String,
@@ -151,6 +152,10 @@ pub struct GlobalConfig {
 }
 
 impl GlobalConfig {
+    pub fn load() -> Result<Self, ConfigurationError> {
+        todo!()
+    }
+
     pub fn convert_from(
         application: ApplicationType,
         mut cfg: Config,

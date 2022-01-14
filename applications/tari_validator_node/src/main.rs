@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #![allow(clippy::too_many_arguments)]
-mod cmd_args;
+mod cli_args;
 mod comms;
 mod dan_node;
 mod default_service_specification;
@@ -38,7 +38,11 @@ use std::{
 use futures::FutureExt;
 use log::*;
 use tari_app_grpc::tari_rpc::validator_node_server::ValidatorNodeServer;
-use tari_app_utilities::{identity_management::setup_node_identity, initialization::init_configuration};
+use tari_app_utilities::{
+    common::configuration::{CommonConfig, ValidatorNodeConfig},
+    identity_management::setup_node_identity,
+    initialization::init_configuration,
+};
 use tari_common::{configuration::bootstrap::ApplicationType, exit_codes::ExitCodes, GlobalConfig};
 use tari_comms::{connectivity::ConnectivityRequester, peer_manager::PeerFeatures, NodeIdentity};
 use tari_comms_dht::Dht;
@@ -60,7 +64,6 @@ use crate::{
 const LOG_TARGET: &str = "tari::validator_node::app";
 
 fn main() {
-    // console_subscriber::init();
     if let Err(exit_code) = main_inner() {
         eprintln!("{:?}", exit_code);
         error!(
@@ -74,16 +77,12 @@ fn main() {
 }
 
 fn main_inner() -> Result<(), ExitCodes> {
-    let (bootstrap, config, _) = init_configuration(ApplicationType::ValidatorNode)?;
-
-    // let _operation_mode = cmd_args::get_operation_mode();
-    // match operation_mode {
-    //     OperationMode::Run => {
+    let cli = CliArgs::parse()?;
+    let common_config: CommonConfig = ConfigLoader::load();
+    let validator_config: ValidatorNodeConfig = ConfigLoader::load();
+    let config = GlobalConfig::load()?;
     let runtime = build_runtime()?;
     runtime.block_on(run_node(config, bootstrap.create_id))?;
-    // }
-    // }
-
     Ok(())
 }
 
