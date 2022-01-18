@@ -38,12 +38,13 @@ use std::{
 use futures::FutureExt;
 use log::*;
 use tari_app_grpc::tari_rpc::validator_node_server::ValidatorNodeServer;
-use tari_app_utilities::{
-    common::configuration::{CommonConfig, ValidatorNodeConfig},
-    identity_management::setup_node_identity,
-    initialization::init_configuration,
+use tari_app_utilities::{identity_management::setup_node_identity, initialization::init_configuration};
+use tari_common::{
+    configuration::{bootstrap::ApplicationType, ValidatorNodeConfig},
+    exit_codes::ExitCodes,
+    CommonConfig,
+    GlobalConfig,
 };
-use tari_common::{configuration::bootstrap::ApplicationType, exit_codes::ExitCodes, GlobalConfig};
 use tari_comms::{connectivity::ConnectivityRequester, peer_manager::PeerFeatures, NodeIdentity};
 use tari_comms_dht::Dht;
 use tari_dan_core::services::{ConcreteAssetProcessor, ConcreteAssetProxy, MempoolServiceHandle, ServiceSpecification};
@@ -77,10 +78,8 @@ fn main() {
 }
 
 fn main_inner() -> Result<(), ExitCodes> {
-    let cli = CliArgs::parse()?;
     let common_config: CommonConfig = ConfigLoader::load();
     let validator_config: ValidatorNodeConfig = ConfigLoader::load();
-    let config = GlobalConfig::load()?;
     let runtime = build_runtime()?;
     runtime.block_on(run_node(config, bootstrap.create_id))?;
     Ok(())

@@ -23,7 +23,7 @@
 use std::io;
 
 use hex::FromHexError;
-use tari_common::{ConfigError, ConfigurationError};
+use tari_common::ConfigurationError;
 use tari_core::transactions::CoinbaseBuildError;
 use thiserror::Error;
 use tonic::transport;
@@ -32,8 +32,6 @@ use tonic::transport;
 pub enum StratumTranscoderProxyError {
     #[error("Configuration error: {0}")]
     ConfigurationError(#[from] ConfigurationError),
-    #[error("Configuration error: {0}")]
-    ConfigError(#[from] ConfigError),
     #[error("Reqwest error: {0}")]
     ReqwestError(#[from] reqwest::Error),
     #[error("Missing data:{0}")]

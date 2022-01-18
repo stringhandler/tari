@@ -57,14 +57,13 @@
 //! ```
 
 pub mod bootstrap;
-mod common_config;
 pub mod error;
 pub mod global;
-pub use common_config::CommonConfig;
 pub mod loader;
 mod network;
 pub use network::Network;
 mod base_node_config;
+mod has_config_prefix;
 mod merge_mining_config;
 pub mod name_server;
 pub mod seconds;

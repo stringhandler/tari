@@ -24,7 +24,7 @@ use std::io;
 
 use hex::FromHexError;
 use hyper::header::InvalidHeaderValue;
-use tari_common::{ConfigError, ConfigurationError};
+use tari_common::ConfigurationError;
 use tari_core::{proof_of_work::monero_rx::MergeMineError, transactions::CoinbaseBuildError};
 use thiserror::Error;
 use tonic::transport;
@@ -33,8 +33,6 @@ use tonic::transport;
 pub enum MmProxyError {
     #[error("Configuration error: {0}")]
     ConfigurationError(#[from] ConfigurationError),
-    #[error("Configuration error: {0}")]
-    ConfigError(#[from] ConfigError),
     #[error("Merge mining error: {source}")]
     MergeMiningError {
         #[from]

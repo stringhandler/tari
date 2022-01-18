@@ -37,12 +37,12 @@
 //! ```
 //! # use config::Config;
 //! # use serde::{Deserialize};
-//! # use tari_common::{NetworkConfigPath, ConfigLoader};
+//! # use tari_common::{HasNetworkConfigPrefix, ConfigLoader};
 //! #[derive(Deserialize)]
 //! struct MyNodeConfig {
 //!     welcome_message: String,
 //! }
-//! impl NetworkConfigPath for MyNodeConfig {
+//! impl HasNetworkConfigPrefix for MyNodeConfig {
 //!     fn main_key_prefix() -> &'static str {
 //!         "my_node"
 //!     }
@@ -62,43 +62,9 @@ use std::{
 
 use config::Config;
 
-use crate::configuration::Network;
+use crate::configuration::{error::ConfigurationError, has_config_prefix::HasConfigPrefix, Network};
 
 //-------------------------------------------    ConfigLoader trait    ------------------------------------------//
-
-/// Load struct from config's main section and subsection override
-///
-/// Implementation of this trait along with Deserialize grants `ConfigLoader` implementation
-pub trait ConfigPath {
-    /// Main configuration section
-    fn main_key_prefix() -> &'static str;
-    /// Overload values from a key prefix based on some configuration value.
-    ///
-    /// Should return a path to configuration table with overloading values.
-    /// Returns `ConfigurationError` if key_prefix field has wrong value.
-    /// Returns Ok(None) if no overload is required
-    fn overload_key_prefix(config: &Config) -> Result<Option<String>, ConfigurationError>;
-    /// Merge and produce sub-config from overload_key_prefix to main_key_prefix,
-    /// which can be used to deserialize Self struct
-    /// If overload key is not present in config it won't make effect
-    fn merge_subconfig(config: &Config) -> Result<Config, ConfigurationError> {
-        use config::Value;
-        match Self::overload_key_prefix(config)? {
-            Some(key) => {
-                let overload: Value = config.get(key.as_str()).unwrap_or_default();
-                let base: Value = config.get(Self::main_key_prefix()).unwrap_or_default();
-                let mut base_config = Config::new();
-                base_config.set(Self::main_key_prefix(), base)?;
-                let mut config = Config::new();
-                // Some magic is required to make them correctly merge
-                config.merge(base_config)?;
-                config.set(Self::main_key_prefix(), overload)?;
-                Ok(config)
-            },
-            None => Ok(config.clone()),
-        }
-    }
-}
 
 /// Load struct from config's main section and network subsection override
 ///
@@ -106,16 +72,16 @@ pub trait ConfigPath {
 /// from the main section defined in this trait.
 ///
 /// Wrong network value will result in Error
-pub trait NetworkConfigPath {
+pub trait HasNetworkConfigPrefix {
     /// Main configuration section
     fn main_key_prefix() -> &'static str;
     /// Path for `network` key in config
     fn network_config_key() -> String {
-        let main = <Self as NetworkConfigPath>::main_key_prefix();
+        let main = <Self as HasNetworkConfigPrefix>::main_key_prefix();
         format!("{}.network", main)
     }
 }
-impl<C: NetworkConfigPath> ConfigPath for C {
+impl<C: HasNetworkConfigPrefix> HasConfigPrefix for C {
     /// Returns the string representing the top level configuration category.
     /// For example, in the following TOML file, options for `main_key_prefix` would be `MainKeyOne` or `MainKeyTwo`:
     /// ```toml
@@ -125,7 +91,7 @@ impl<C: NetworkConfigPath> ConfigPath for C {
     ///   subkey2=1
     /// ```
     fn main_key_prefix() -> &'static str {
-        <Self as NetworkConfigPath>::main_key_prefix()
+        <Self as HasNetworkConfigPrefix>::main_key_prefix()
     }
 
     /// Loads the desired subsection from the config file into the provided `config` and merges the results. The
@@ -161,7 +127,7 @@ impl<C: NetworkConfigPath> ConfigPath for C {
 /// ```
 /// # use config::Config;
 /// # use serde::{Deserialize};
-/// use tari_common::{ConfigLoader, NetworkConfigPath};
+/// use tari_common::{ConfigLoader, HasNetworkConfigPrefix};
 ///
 /// #[derive(Deserialize)]
 /// struct MyNodeConfig {
@@ -176,7 +142,7 @@ impl<C: NetworkConfigPath> ConfigPath for C {
 /// fn bye() -> String {
 ///     "bye bye".into()
 /// }
-/// impl NetworkConfigPath for MyNodeConfig {
+/// impl HasNetworkConfigPrefix for MyNodeConfig {
 ///     fn main_key_prefix() -> &'static str {
 ///         "my_node"
 ///     }
@@ -193,7 +159,7 @@ impl<C: NetworkConfigPath> ConfigPath for C {
 /// let my_config = <MyNodeConfig as ConfigLoader>::load_from(&config).unwrap();
 /// assert_eq!(my_config.goodbye_message, "see you soon".to_string());
 /// ```
-pub trait ConfigLoader: ConfigPath + for<'de> serde::de::Deserialize<'de> {
+pub trait ConfigLoader: HasConfigPrefix + for<'de> serde::de::Deserialize<'de> {
     /// Try to load configuration from supplied Config by `main_key_prefix()`
     /// with values overloaded from `overload_key_prefix()`.
     ///
@@ -206,14 +172,14 @@ pub trait ConfigLoader: ConfigPath + for<'de> serde::de::Deserialize<'de> {
         Ok(merger.get(Self::main_key_prefix())?)
     }
 }
-impl<C> ConfigLoader for C where C: ConfigPath + for<'de> serde::de::Deserialize<'de> {}
+impl<C> ConfigLoader for C where C: HasConfigPrefix + for<'de> serde::de::Deserialize<'de> {}
 
 /// Configuration loader based on ConfigPath selectors with Defaults
 ///
 /// ```
 /// use config::Config;
 /// use serde::{Deserialize, Serialize};
-/// use tari_common::{DefaultConfigLoader, NetworkConfigPath};
+/// use tari_common::{DefaultConfigLoader, HasNetworkConfigPrefix};
 ///
 /// #[derive(Serialize, Deserialize)]
 /// struct MyNodeConfig {
@@ -228,7 +194,7 @@ impl<C> ConfigLoader for C where C: ConfigPath + for<'de> serde::de::Deserialize
 ///         }
 ///     }
 /// }
-/// impl NetworkConfigPath for MyNodeConfig {
+/// impl HasNetworkConfigPrefix for MyNodeConfig {
 ///     fn main_key_prefix() -> &'static str {
 ///         "my_node"
 ///     }
@@ -240,7 +206,7 @@ impl<C> ConfigLoader for C where C: ConfigPath + for<'de> serde::de::Deserialize
 /// assert_eq!(my_config.welcome_message, MyNodeConfig::default().welcome_message);
 /// ```
 pub trait DefaultConfigLoader:
-    ConfigPath + Default + serde::ser::Serialize + for<'de> serde::de::Deserialize<'de>
+    HasConfigPrefix + Default + serde::ser::Serialize + for<'de> serde::de::Deserialize<'de>
 {
     /// Try to load configuration from supplied Config by `main_key_prefix()`
     /// with values overloaded from `overload_key_prefix()`.
@@ -255,74 +221,10 @@ pub trait DefaultConfigLoader:
         Ok(merger.get(Self::main_key_prefix())?)
     }
 }
-impl<C> DefaultConfigLoader for C where C: ConfigPath + Default + serde::ser::Serialize + for<'de> serde::de::Deserialize<'de>
+impl<C> DefaultConfigLoader for C where C: HasConfigPrefix + Default + serde::ser::Serialize + for<'de> serde::de::Deserialize<'de>
 {}
 
 //-------------------------------------      Configuration errors      --------------------------------------//
-
-#[derive(Debug)]
-pub struct ConfigurationError {
-    field: String,
-    value: Option<String>,
-    message: String,
-}
-
-impl ConfigurationError {
-    pub fn new(field: &str, value: Option<String>, msg: &str) -> Self {
-        ConfigurationError {
-            field: String::from(field),
-            value,
-            message: String::from(msg),
-        }
-    }
-}
-
-impl Display for ConfigurationError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-        match &self.value {
-            Some(v) => write!(f, "Invalid value `{}` for {}: {}", v, self.field, self.message),
-            None => write!(f, "Invalid value for {}: {}", self.field, self.message),
-        }
-    }
-}
-
-impl Error for ConfigurationError {}
-impl From<config::ConfigError> for ConfigurationError {
-    fn from(err: config::ConfigError) -> Self {
-        use config::ConfigError;
-        match err {
-            ConfigError::FileParse { uri, cause } if uri.is_some() => Self {
-                field: uri.unwrap(),
-                value: None,
-                message: cause.to_string(),
-            },
-            ConfigError::Type {
-                ref unexpected,
-                ref key,
-                ..
-            } => Self {
-                field: format!("{:?}", key),
-                value: Some(unexpected.to_string()),
-                message: err.to_string(),
-            },
-            ConfigError::NotFound(key) => Self {
-                field: key,
-                value: None,
-                message: "required key not found".to_string(),
-            },
-            x => Self::new("", None, x.to_string().as_str()),
-        }
-    }
-}
-impl From<serde_json::error::Error> for ConfigurationError {
-    fn from(err: serde_json::error::Error) -> Self {
-        Self {
-            field: "".to_string(),
-            value: None,
-            message: err.to_string(),
-        }
-    }
-}
 
 #[cfg(test)]
 mod test {
@@ -361,7 +263,7 @@ mod test {
     fn serde_default_string() -> String {
         "ispublic".into()
     }
-    impl NetworkConfigPath for SuperTari {
+    impl HasNetworkConfigPrefix for SuperTari {
         fn main_key_prefix() -> &'static str {
             "crypto"
         }

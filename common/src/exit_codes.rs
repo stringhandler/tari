@@ -80,14 +80,6 @@ impl ExitCodes {
     }
 }
 
-impl From<super::ConfigError> for ExitCodes {
-    fn from(err: super::ConfigError) -> Self {
-        // TODO: Move it out
-        // error!(target: LOG_TARGET, "{}", err);
-        Self::ConfigError(err.to_string())
-    }
-}
-
 impl From<crate::ConfigurationError> for ExitCodes {
     fn from(err: crate::ConfigurationError) -> Self {
         Self::ConfigError(err.to_string())

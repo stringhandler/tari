@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use serde::{Deserialize, Serialize};
-use tari_common::NetworkConfigPath;
+use tari_common::{configuration::seconds, HasNetworkConfigPrefix};
 
 use crate::mempool::{reorg_pool::ReorgPoolConfig, unconfirmed_pool::UnconfirmedPoolConfig};
 
@@ -32,7 +32,7 @@ pub struct MempoolConfig {
     pub reorg_pool: ReorgPoolConfig,
 }
 
-impl NetworkConfigPath for MempoolConfig {
+impl HasNetworkConfigPrefix for MempoolConfig {
     fn main_key_prefix() -> &'static str {
         "mempool"
     }
@@ -57,7 +57,7 @@ impl Default for MempoolServiceConfig {
     }
 }
 
-impl NetworkConfigPath for MempoolServiceConfig {
+impl HasNetworkConfigPrefix for MempoolServiceConfig {
     fn main_key_prefix() -> &'static str {
         "mempool_service"
     }

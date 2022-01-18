@@ -168,7 +168,7 @@ impl FromStr for UpdateSpec {
         }
 
         Ok(UpdateSpec {
-            application: application.parse()?,
+            application: application.parse().map_err(|s: String| anyhow!(s))?,
             arch: arch.to_string(),
             version: version.parse()?,
             hash,

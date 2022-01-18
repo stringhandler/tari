@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use tari_common::{configuration::bootstrap::ApplicationType, ConfigBootstrap, DefaultConfigLoader, NetworkConfigPath};
+use tari_common::{
+    configuration::bootstrap::ApplicationType,
+    ConfigBootstrap,
+    DefaultConfigLoader,
+    HasNetworkConfigPrefix,
+};
 
 #[derive(StructOpt, Debug)]
 /// The reference Tari cryptocurrency base node implementation
@@ -44,7 +49,7 @@ impl Default for MyNodeConfig {
         }
     }
 }
-impl NetworkConfigPath for MyNodeConfig {
+impl HasNetworkConfigPrefix for MyNodeConfig {
     fn main_key_prefix() -> &'static str {
         "my_node"
     }

@@ -4,12 +4,17 @@ use config::Config;
 use log::{debug, info};
 use multiaddr::{Multiaddr, Protocol};
 
-use crate::{configuration::bootstrap::ApplicationType, dir_utils::default_subdir, ConfigBootstrap, ConfigError};
+use crate::{
+    configuration::bootstrap::ApplicationType,
+    dir_utils::default_subdir,
+    ConfigBootstrap,
+    ConfigurationError,
+};
 
 const LOG_TARGET: &str = "tari::common::utils";
 //-------------------------------------           Main API functions         --------------------------------------//
 
-pub fn load_configuration(bootstrap: &ConfigBootstrap) -> Result<Config, ConfigError> {
+pub fn load_configuration(bootstrap: &ConfigBootstrap) -> Result<Config, String> {
     debug!(
         target: LOG_TARGET,
         "Loading configuration file from  {}",
@@ -20,11 +25,11 @@ pub fn load_configuration(bootstrap: &ConfigBootstrap) -> Result<Config, ConfigE
     let filename = bootstrap
         .config
         .to_str()
-        .ok_or_else(|| ConfigError::new("Invalid config file path", None))?;
+        .ok_or_else(|| "Invalid config file path".to_string())?;
     let config_file = config::File::with_name(filename);
 
     cfg.merge(config_file)
-        .map_err(|e| ConfigError::new("Failed to parse the configuration file", Some(e.to_string())))?;
+        .map_err(|e| format!("Failed to parse the configuration file:{}", e.to_string()))?;
     info!(target: LOG_TARGET, "Configuration file loaded.");
 
     Ok(cfg)

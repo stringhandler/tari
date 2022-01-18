@@ -78,15 +78,18 @@
 //! # std::fs::remove_dir_all(temp_dir).unwrap();
 //! ```
 
+mod common_config;
+pub use common_config::CommonConfig;
+
 pub mod exit_codes;
 #[macro_use]
 mod logging;
 pub mod configuration;
 pub use configuration::{
     bootstrap::{install_configuration, ConfigBootstrap},
-    error::ConfigError,
+    error::ConfigurationError,
     global::{CommsTransport, DatabaseType, GlobalConfig, SocksAuthentication, TorControlAuthentication},
-    loader::{ConfigLoader, ConfigPath, ConfigurationError, DefaultConfigLoader, NetworkConfigPath},
+    loader::{ConfigLoader, DefaultConfigLoader, HasNetworkConfigPrefix},
     name_server::DnsNameServer,
     utils::{config_installer, default_config, load_configuration},
 };

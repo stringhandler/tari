@@ -58,10 +58,7 @@ use std::{
 
 use structopt::StructOpt;
 
-use super::{
-    error::ConfigError,
-    utils::{config_installer, load_configuration},
-};
+use super::utils::{config_installer, load_configuration};
 use crate::{
     dir_utils,
     initialize_logging,
@@ -218,7 +215,7 @@ impl ConfigBootstrap {
     ///
     /// Without `--init` flag provided configuration and directories will be created only
     /// after user's confirmation.
-    pub fn init_dirs(&mut self, application_type: ApplicationType) -> Result<(), ConfigError> {
+    pub fn init_dirs(&mut self, application_type: ApplicationType) -> Result<(), String> {
         if self.base_path.to_str() == Some("") {
             self.base_path = dir_utils::default_path("", None);
         } else {
@@ -227,9 +224,9 @@ impl ConfigBootstrap {
 
         // Create the tari data directory
         dir_utils::create_data_directory(Some(&self.base_path)).map_err(|err| {
-            ConfigError::new(
-                "We couldn't create a default Tari data directory and have to quit now. This makes us sad :(",
-                Some(err.to_string()),
+            format!(
+                "We couldn't create a default Tari data directory and have to quit now. This makes us sad :( {}",
+                err.to_string(),
             )
         })?;
 
@@ -315,16 +312,16 @@ impl ConfigBootstrap {
 
     /// Set up application-level logging using the Log4rs configuration file
     /// based on supplied CLI arguments
-    pub fn initialize_logging(&self) -> Result<(), ConfigError> {
+    pub fn initialize_logging(&self) -> Result<(), String> {
         if initialize_logging(&self.log_config, &self.base_path) {
             Ok(())
         } else {
-            Err(ConfigError::new("Failed to initialize logging", None))
+            Err("Failed to initialize logging".to_string())
         }
     }
 
     /// Load configuration from files located based on supplied CLI arguments
-    pub fn load_configuration(&self) -> Result<config::Config, ConfigError> {
+    pub fn load_configuration(&self) -> Result<config::Config, String> {
         load_configuration(self)
     }
 }
@@ -385,7 +382,7 @@ impl ApplicationType {
 }
 
 impl FromStr for ApplicationType {
-    type Err = ConfigError;
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use ApplicationType::*;
@@ -396,7 +393,7 @@ impl FromStr for ApplicationType {
             "miner" => Ok(MiningNode),
             "validator-node" => Ok(ValidatorNode),
             "stratum-proxy" => Ok(StratumTranscoder),
-            _ => Err(ConfigError::new("Invalid ApplicationType", None)),
+            _ => Err("Invalid ApplicationType".to_string()),
         }
     }
 }

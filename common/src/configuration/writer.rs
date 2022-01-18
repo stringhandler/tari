@@ -9,7 +9,7 @@
 //!     ConfigLoader,
 //!     ConfigPath,
 //!     ConfigurationError,
-//!     NetworkConfigPath,
+//!     HasNetworkConfigPrefix,
 //! };
 //! use toml::value::Value;
 //!
@@ -31,7 +31,7 @@
 //!     port: u16,
 //!     address: String,
 //! }
-//! impl NetworkConfigPath for MyNodeConfig {
+//! impl HasNetworkConfigPrefix for MyNodeConfig {
 //!     fn main_key_prefix() -> &'static str {
 //!         "my_node"
 //!     }
@@ -67,13 +67,13 @@
 //! ```
 use config::Config;
 
-use super::loader::{ConfigPath, ConfigurationError};
+use crate::{configuration::has_config_prefix::HasConfigPrefix, ConfigurationError};
 
 /// Configuration writer based on ConfigPath selectors
 ///
 /// It is autoimplemented for types implementing [`ConfigPath`] and [`serde::ser::Serialize`]
 /// Refer to [module](crate::configuration::writer) documentation for example
-pub trait ConfigWriter: ConfigPath + serde::ser::Serialize {
+pub trait ConfigWriter: HasConfigPrefix + serde::ser::Serialize {
     /// Merges structure into configuration by `main_key_prefix()`
     /// with values overloaded from `overload_key_prefix()`.
     fn merge_into(&self, config: &mut Config) -> Result<(), ConfigurationError> {
@@ -88,4 +88,4 @@ pub trait ConfigWriter: ConfigPath + serde::ser::Serialize {
         Ok(())
     }
 }
-impl<C> ConfigWriter for C where C: ConfigPath + serde::ser::Serialize {}
+impl<C> ConfigWriter for C where C: HasConfigPrefix + serde::ser::Serialize {}

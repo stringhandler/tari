@@ -38,17 +38,15 @@ use config::{Config, ConfigError, Environment};
 use multiaddr::{Error, Multiaddr, Protocol};
 use tari_storage::lmdb_store::LMDBConfig;
 
-use crate::{
-    configuration::{
-        bootstrap::ApplicationType,
-        name_server::DnsNameServer,
-        BaseNodeConfig,
-        MergeMiningConfig,
-        Network,
-        ValidatorNodeConfig,
-        WalletConfig,
-    },
-    ConfigurationError,
+use crate::configuration::{
+    bootstrap::ApplicationType,
+    error::ConfigurationError,
+    name_server::DnsNameServer,
+    BaseNodeConfig,
+    MergeMiningConfig,
+    Network,
+    ValidatorNodeConfig,
+    WalletConfig,
 };
 
 const DB_INIT_DEFAULT_MB: usize = 1000;
@@ -63,7 +61,6 @@ const DB_RESIZE_THRESHOLD_MIN_MB: i64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct GlobalConfig {
-    pub common: CommonConfig,
     pub autoupdate_check_interval: Option<Duration>,
     pub autoupdate_dns_hosts: Vec<String>,
     pub autoupdate_hashes_url: String,
