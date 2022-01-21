@@ -24,7 +24,7 @@ use core::iter;
 use std::path::Path;
 
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_core::consensus::{ConsensusConstants, ConsensusManager};
 use tempfile::{tempdir, TempDir};
 

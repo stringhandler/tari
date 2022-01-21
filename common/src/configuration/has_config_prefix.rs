@@ -22,7 +22,7 @@
 
 use config::Config;
 
-use crate::ConfigurationError;
+use crate::configuration::ConfigurationError;
 
 /// Load struct from config's main section and subsection override
 pub trait HasConfigPrefix {

@@ -28,7 +28,7 @@ use std::{
 use config::Config;
 use serde::Deserialize;
 
-use crate::ConfigurationError;
+use crate::configuration::ConfigurationError;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ValidatorNodeConfig {

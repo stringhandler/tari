@@ -25,12 +25,11 @@ use std::{clone::Clone, fs, path::Path, str::FromStr, string::ToString, sync::Ar
 use log::*;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
-use tari_common::{
-    configuration::{bootstrap::prompt, utils::get_local_ip},
-    exit_codes::ExitCodes,
-};
+use tari_common::exit_codes::ExitCodes;
 use tari_comms::{multiaddr::Multiaddr, peer_manager::PeerFeatures, NodeIdentity};
 use tari_crypto::tari_utilities::hex::Hex;
+
+use crate::utilities::{get_local_ip, prompt};
 
 pub const LOG_TARGET: &str = "tari_application";
 

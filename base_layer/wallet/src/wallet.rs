@@ -24,7 +24,7 @@ use std::{marker::PhantomData, sync::Arc};
 
 use digest::Digest;
 use log::*;
-use tari_common::configuration::bootstrap::ApplicationType;
+use tari_common::types::ApplicationType;
 use tari_common_types::{
     transaction::TxId,
     types::{ComSignature, PrivateKey, PublicKey},

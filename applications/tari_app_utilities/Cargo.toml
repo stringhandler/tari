@@ -22,6 +22,7 @@ tokio = { version = "1.11", features = ["signal"] }
 serde = "1.0.126"
 structopt = { version = "0.3.13", default_features = false }
 thiserror = "^1.0.26"
+get_if_addrs = "0.5.3"
 
 [build-dependencies]
 tari_build = { path = "../../infrastructure/build" }

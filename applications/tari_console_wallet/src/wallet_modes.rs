@@ -23,7 +23,7 @@ use std::{fs, io::Stdout, path::PathBuf};
 
 use log::*;
 use rand::{rngs::OsRng, seq::SliceRandom};
-use tari_common::{exit_codes::ExitCodes, ConfigBootstrap, GlobalConfig};
+use tari_common::exit_codes::ExitCodes;
 use tari_comms::{multiaddr::Multiaddr, peer_manager::Peer, utils::multiaddr::multiaddr_to_socketaddr};
 use tari_wallet::WalletSqlite;
 use tokio::runtime::Handle;

@@ -29,7 +29,7 @@ use std::{
 };
 
 use croaring::Bitmap;
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_common_types::{
     chain_metadata::ChainMetadata,
     types::{Commitment, HashOutput, PublicKey, Signature},

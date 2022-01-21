@@ -56,23 +56,24 @@
 //! # etc..
 //! ```
 
-pub mod bootstrap;
-pub mod error;
-pub mod global;
-pub mod loader;
-mod network;
-pub use network::Network;
 mod base_node_config;
+mod bootstrap;
+mod error;
+mod global;
 mod has_config_prefix;
+mod loader;
 mod merge_mining_config;
-pub mod name_server;
-pub mod seconds;
-pub mod utils;
+pub mod serialize;
+mod tari_config;
+mod utils;
 mod validator_node_config;
 mod wallet_config;
-pub mod writer;
+mod writer;
 
-pub use base_node_config::BaseNodeConfig;
-pub use merge_mining_config::MergeMiningConfig;
-pub use validator_node_config::ValidatorNodeConfig;
-pub use wallet_config::WalletConfig;
+pub use error::ConfigurationError;
+pub use tari_config::TariConfig;
+
+// use base_node_config::BaseNodeConfig;
+// use merge_mining_config::MergeMiningConfig;
+// pub use validator_node_config::ValidatorNodeConfig;
+// pub use wallet_config::WalletConfig;

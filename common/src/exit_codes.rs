@@ -80,8 +80,8 @@ impl ExitCodes {
     }
 }
 
-impl From<crate::ConfigurationError> for ExitCodes {
-    fn from(err: crate::ConfigurationError) -> Self {
+impl From<crate::configuration::ConfigurationError> for ExitCodes {
+    fn from(err: crate::configuration::ConfigurationError) -> Self {
         Self::ConfigError(err.to_string())
     }
 }

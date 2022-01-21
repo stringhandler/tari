@@ -24,7 +24,7 @@ use std::{sync::Arc, time::Duration};
 
 use futures::{future, FutureExt};
 use rustls::{ClientConfig, ProtocolVersion, RootCertStore};
-use tari_common::DnsNameServer;
+use tari_common::types::DnsNameServer;
 use tari_shutdown::Shutdown;
 use tokio::task;
 use trust_dns_client::{

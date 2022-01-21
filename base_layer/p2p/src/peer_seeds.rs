@@ -23,7 +23,7 @@
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use tari_common::DnsNameServer;
+use tari_common::types::DnsNameServer;
 use tari_comms::{
     multiaddr::Multiaddr,
     peer_manager::{NodeId, Peer, PeerFeatures},

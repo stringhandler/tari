@@ -45,10 +45,10 @@ use init::{
 use log::*;
 use opentelemetry::{self, global, KeyValue};
 use recovery::prompt_private_key_from_seed_words;
-use tari_app_utilities::{consts, initialization::init_configuration};
+use tari_app_utilities::consts;
 #[cfg(all(unix, feature = "libtor"))]
 use tari_common::CommsTransport;
-use tari_common::{configuration::bootstrap::ApplicationType, exit_codes::ExitCodes, ConfigBootstrap};
+use tari_common::{exit_codes::ExitCodes, types::ApplicationType};
 use tari_key_manager::cipher_seed::CipherSeed;
 #[cfg(all(unix, feature = "libtor"))]
 use tari_libtor::tor::Tor;

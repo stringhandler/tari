@@ -43,23 +43,24 @@ use futures::future;
 use hyper::{service::make_service_fn, Server};
 use proxy::{MergeMiningProxyConfig, MergeMiningProxyService};
 use tari_app_grpc::tari_rpc as grpc;
-use tari_app_utilities::initialization::init_configuration;
-use tari_common::configuration::bootstrap::ApplicationType;
+use tari_common::{configuration::TariConfig, types::ApplicationType};
 use tokio::time::Duration;
 
 use crate::{block_template_data::BlockTemplateRepository, error::MmProxyError};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let (_, config, _) = init_configuration(ApplicationType::MergeMiningProxy)?;
-
-    let config = match MergeMiningProxyConfig::try_from(config) {
-        Ok(c) => c,
-        Err(msg) => {
-            eprintln!("Invalid config: {}", msg);
-            return Ok(());
-        },
-    };
+    // let (_, config, _) = init_configuration(ApplicationType::MergeMiningProxy)?;
+    //
+    // let config = match MergeMiningProxyConfig::try_from(config) {
+    //     Ok(c) => c,
+    //     Err(msg) => {
+    //         eprintln!("Invalid config: {}", msg);
+    //         return Ok(());
+    //     },
+    // };
+    let tari_config = TariConfig::load();
+    let config = tari_config.get_section::<MergeMiningProxyConfig>();
     let addr = config.proxy_host_address;
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(5))

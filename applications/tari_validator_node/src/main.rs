@@ -78,7 +78,8 @@ fn main() {
 }
 
 fn main_inner() -> Result<(), ExitCodes> {
-    let common_config: CommonConfig = ConfigLoader::load();
+    let tari_config = TariConfig::load();
+    let common_config = tari_config.get_section::<CommonConfig>();
     let validator_config: ValidatorNodeConfig = ConfigLoader::load();
     let runtime = build_runtime()?;
     runtime.block_on(run_node(config, bootstrap.create_id))?;

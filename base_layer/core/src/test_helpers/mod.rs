@@ -27,7 +27,7 @@ use std::{iter, path::Path, sync::Arc};
 
 pub use block_spec::{BlockSpec, BlockSpecs};
 use rand::{distributions::Alphanumeric, Rng};
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_comms::PeerManager;
 use tari_storage::{lmdb_store::LMDBBuilder, LMDBWrapper};
 use tari_utilities::Hashable;

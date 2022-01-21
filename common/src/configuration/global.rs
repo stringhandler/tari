@@ -38,15 +38,9 @@ use config::{Config, ConfigError, Environment};
 use multiaddr::{Error, Multiaddr, Protocol};
 use tari_storage::lmdb_store::LMDBConfig;
 
-use crate::configuration::{
-    bootstrap::ApplicationType,
-    error::ConfigurationError,
-    name_server::DnsNameServer,
-    BaseNodeConfig,
-    MergeMiningConfig,
-    Network,
-    ValidatorNodeConfig,
-    WalletConfig,
+use crate::{
+    configuration::error::ConfigurationError,
+    types::{ApplicationType, DatabaseType, DnsNameServer, Network, SocksAuthentication},
 };
 
 const DB_INIT_DEFAULT_MB: usize = 1000;
@@ -66,7 +60,7 @@ pub struct GlobalConfig {
     pub autoupdate_hashes_url: String,
     pub autoupdate_hashes_sig_url: String,
     pub network: Network,
-    pub comms_transport: CommsTransport,
+    // pub comms_transport: CommsTransport,
     pub auxilary_tcp_listener_address: Option<Multiaddr>,
     pub allow_test_addresses: bool,
     pub listnener_liveness_max_sessions: usize,
@@ -82,8 +76,8 @@ pub struct GlobalConfig {
     pub core_threads: Option<usize>,
     pub base_node_identity_file: PathBuf,
     pub public_address: Option<Multiaddr>,
-    pub base_node_config: Option<BaseNodeConfig>,
-    pub wallet_config: Option<WalletConfig>,
+    // pub base_node_config: Option<BaseNodeConfig>,
+    // pub wallet_config: Option<WalletConfig>,
     pub peer_seeds: Vec<String>,
     pub dns_seeds: Vec<String>,
     pub dns_seeds_name_server: DnsNameServer,
@@ -136,15 +130,15 @@ pub struct GlobalConfig {
     pub flood_ban_max_msg_count: usize,
     pub mine_on_tip_only: bool,
     pub validate_tip_timeout_sec: u64,
-    pub validator_node: Option<ValidatorNodeConfig>,
+    // pub validator_node: Option<ValidatorNodeConfig>,
     pub mining_pool_address: String,
     pub mining_wallet_address: String,
     pub mining_worker_name: String,
     pub base_node_bypass_range_proof_verification: bool,
     pub metrics: MetricsConfig,
+    // pub merge_mining_config: Option<MergeMiningConfig>,
     pub base_node_use_libtor: bool,
     pub console_wallet_use_libtor: bool,
-    pub merge_mining_config: Option<MergeMiningConfig>,
     pub blockchain_track_reorgs: bool,
 }
 
@@ -315,8 +309,9 @@ fn convert_node_config(
         .unwrap_or_else(|_| "config/base_node_tor.json".to_string())
         .into();
 
+    todo!();
     // Transport
-    let comms_transport = network_transport_config(&cfg, application, net_str)?;
+    // let comms_transport = network_transport_config(&cfg, application, net_str)?;
 
     let key = config_string("base_node", net_str, "auxilary_tcp_listener_address");
     let auxilary_tcp_listener_address = optional(cfg.get_str(&key))?
@@ -337,56 +332,56 @@ fn convert_node_config(
                 .map_err(|e| ConfigurationError::new(&key, Some(addr), &e.to_string()))
         })
         .transpose()?;
-
-    let mut base_node_config = None;
+    todo!();
+    // let mut base_node_config = None;
     // TODO: Create Mining node config, do the same for below
-    if application == ApplicationType::BaseNode || application == ApplicationType::MiningNode {
-        let mut bn_config = BaseNodeConfig::default();
-        // GPRC enabled
-        let key = "base_node.grpc_enabled";
-        let grpc_enabled = cfg.get_bool(key).unwrap_or_default();
+    // if application == ApplicationType::BaseNode || application == ApplicationType::MiningNode {
+    //     let mut bn_config = BaseNodeConfig::default();
+    //     // GPRC enabled
+    //     let key = "base_node.grpc_enabled";
+    //     let grpc_enabled = cfg.get_bool(key).unwrap_or_default();
+    //
+    //     bn_config.grpc_address = if grpc_enabled {
+    //         let key = "base_node.grpc_address";
+    //         let addr = cfg
+    //             .get_str(key)
+    //             .unwrap_or_else(|_| "/ip4/127.0.0.1/tcp/18142".to_string());
+    //
+    //         let grpc_address = addr
+    //             .parse::<Multiaddr>()
+    //             .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))?;
+    //
+    //         Some(grpc_address)
+    //     } else {
+    //         None
+    //     };
+    //     base_node_config = Some(bn_config);
+    // }
 
-        bn_config.grpc_address = if grpc_enabled {
-            let key = "base_node.grpc_address";
-            let addr = cfg
-                .get_str(key)
-                .unwrap_or_else(|_| "/ip4/127.0.0.1/tcp/18142".to_string());
-
-            let grpc_address = addr
-                .parse::<Multiaddr>()
-                .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))?;
-
-            Some(grpc_address)
-        } else {
-            None
-        };
-        base_node_config = Some(bn_config);
-    }
-
-    let mut wallet_config = None;
-    // TODO: Create Mining node config, do the same for above
-    if application == ApplicationType::ConsoleWallet || application == ApplicationType::MiningNode {
-        let mut config = WalletConfig::default();
-        // GPRC enabled
-        let key = "wallet.grpc_enabled";
-        let grpc_enabled = cfg.get_bool(key).unwrap_or_default();
-
-        config.grpc_address = if grpc_enabled {
-            let key = "wallet.grpc_address";
-            let addr = cfg
-                .get_str(key)
-                .unwrap_or_else(|_| "/ip4/127.0.0.1/tcp/18143".to_string());
-
-            let grpc_address = addr
-                .parse::<Multiaddr>()
-                .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))?;
-
-            Some(grpc_address)
-        } else {
-            None
-        };
-        wallet_config = Some(config);
-    }
+    // let mut wallet_config = None;
+    // // TODO: Create Mining node config, do the same for above
+    // if application == ApplicationType::ConsoleWallet || application == ApplicationType::MiningNode {
+    //     let mut config = WalletConfig::default();
+    //     // GPRC enabled
+    //     let key = "wallet.grpc_enabled";
+    //     let grpc_enabled = cfg.get_bool(key).unwrap_or_default();
+    //
+    //     config.grpc_address = if grpc_enabled {
+    //         let key = "wallet.grpc_address";
+    //         let addr = cfg
+    //             .get_str(key)
+    //             .unwrap_or_else(|_| "/ip4/127.0.0.1/tcp/18143".to_string());
+    //
+    //         let grpc_address = addr
+    //             .parse::<Multiaddr>()
+    //             .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))?;
+    //
+    //         Some(grpc_address)
+    //     } else {
+    //         None
+    //     };
+    //     wallet_config = Some(config);
+    // }
 
     // Peer and DNS seeds
     let key = config_string("common", net_str, "peer_seeds");
@@ -654,83 +649,83 @@ fn convert_node_config(
             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))? as u64,
     );
 
-    let merge_mining_config = match application {
-        ApplicationType::MergeMiningProxy => {
-            let key = "merge_mining_proxy.monerod_url";
-            let mut monerod_url: Vec<String> = cfg
-                .get_array(key)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|v| {
-                    v.into_str()
-                        .map_err(|err| ConfigurationError::new(key, None, &err.to_string()))
-                })
-                .collect::<Result<_, _>>()?;
-
-            // default to stagenet on empty
-            if monerod_url.is_empty() {
-                monerod_url = vec![
-                    "http://stagenet.xmr-tw.org:38081".to_string(),
-                    "http://singapore.node.xmr.pm:38081".to_string(),
-                    "http://xmr-lux.boldsuck.org:38081".to_string(),
-                    "http://monero-stagenet.exan.tech:38081".to_string(),
-                ];
-            }
-
-            let key = "merge_mining_proxy.monerod_use_auth";
-            let monerod_use_auth = cfg
-                .get_bool(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
-
-            let key = "merge_mining_proxy.monerod_username";
-            let monerod_username = cfg
-                .get_str(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
-
-            let key = "merge_mining_proxy.monerod_password";
-            let monerod_password = cfg
-                .get_str(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
-
-            let key = "merge_mining_proxy.proxy_host_address";
-            let proxy_host_address = cfg
-                .get_str(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
-                .and_then(|addr| {
-                    addr.parse::<SocketAddr>()
-                        .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
-                })?;
-
-            let key = "merge_mining_proxy.base_node_grpc_address";
-            let base_node_grpc_address = cfg
-                .get_str(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
-                .and_then(|addr| {
-                    addr.parse::<Multiaddr>()
-                        .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))
-                })?;
-
-            let key = "merge_mining_proxy.wallet_grpc_address";
-            let wallet_grpc_address = cfg
-                .get_str(key)
-                .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
-                .and_then(|addr| {
-                    addr.parse::<Multiaddr>()
-                        .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))
-                })?;
-
-            Some(MergeMiningConfig {
-                monerod_url,
-                monerod_use_auth,
-                monerod_username,
-                monerod_password,
-                proxy_host_address,
-                base_node_grpc_address,
-                wallet_grpc_address,
-            })
-        },
-        _ => None,
-    };
+    // let merge_mining_config = match application {
+    //     ApplicationType::MergeMiningProxy => {
+    //         let key = "merge_mining_proxy.monerod_url";
+    //         let mut monerod_url: Vec<String> = cfg
+    //             .get_array(key)
+    //             .unwrap_or_default()
+    //             .into_iter()
+    //             .map(|v| {
+    //                 v.into_str()
+    //                     .map_err(|err| ConfigurationError::new(key, None, &err.to_string()))
+    //             })
+    //             .collect::<Result<_, _>>()?;
+    //
+    //         // default to stagenet on empty
+    //         if monerod_url.is_empty() {
+    //             monerod_url = vec![
+    //                 "http://stagenet.xmr-tw.org:38081".to_string(),
+    //                 "http://singapore.node.xmr.pm:38081".to_string(),
+    //                 "http://xmr-lux.boldsuck.org:38081".to_string(),
+    //                 "http://monero-stagenet.exan.tech:38081".to_string(),
+    //             ];
+    //         }
+    //
+    //         let key = "merge_mining_proxy.monerod_use_auth";
+    //         let monerod_use_auth = cfg
+    //             .get_bool(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
+    //
+    //         let key = "merge_mining_proxy.monerod_username";
+    //         let monerod_username = cfg
+    //             .get_str(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
+    //
+    //         let key = "merge_mining_proxy.monerod_password";
+    //         let monerod_password = cfg
+    //             .get_str(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))?;
+    //
+    //         let key = "merge_mining_proxy.proxy_host_address";
+    //         let proxy_host_address = cfg
+    //             .get_str(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
+    //             .and_then(|addr| {
+    //                 addr.parse::<SocketAddr>()
+    //                     .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
+    //             })?;
+    //
+    //         let key = "merge_mining_proxy.base_node_grpc_address";
+    //         let base_node_grpc_address = cfg
+    //             .get_str(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
+    //             .and_then(|addr| {
+    //                 addr.parse::<Multiaddr>()
+    //                     .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))
+    //             })?;
+    //
+    //         let key = "merge_mining_proxy.wallet_grpc_address";
+    //         let wallet_grpc_address = cfg
+    //             .get_str(key)
+    //             .map_err(|e| ConfigurationError::new(key, None, &e.to_string()))
+    //             .and_then(|addr| {
+    //                 addr.parse::<Multiaddr>()
+    //                     .map_err(|e| ConfigurationError::new(key, Some(addr), &e.to_string()))
+    //             })?;
+    //
+    //         Some(MergeMiningConfig {
+    //             monerod_url,
+    //             monerod_use_auth,
+    //             monerod_username,
+    //             monerod_password,
+    //             proxy_host_address,
+    //             base_node_grpc_address,
+    //             wallet_grpc_address,
+    //         })
+    //     },
+    //     _ => None,
+    // };
 
     let key = config_string("stratum_transcoder", net_str, "transcoder_host_address");
     let transcoder_host_address = cfg
@@ -802,7 +797,7 @@ fn convert_node_config(
         autoupdate_hashes_url,
         autoupdate_hashes_sig_url,
         network,
-        comms_transport,
+        // comms_transport,
         auxilary_tcp_listener_address,
         allow_test_addresses,
         listnener_liveness_max_sessions: liveness_max_sessions,
@@ -818,8 +813,8 @@ fn convert_node_config(
         core_threads,
         base_node_identity_file,
         public_address,
-        base_node_config,
-        wallet_config,
+        // base_node_config,
+        // wallet_config,
         peer_seeds,
         dns_seeds,
         dns_seeds_name_server,
@@ -872,7 +867,7 @@ fn convert_node_config(
         flood_ban_max_msg_count,
         mine_on_tip_only,
         validate_tip_timeout_sec,
-        validator_node: ValidatorNodeConfig::convert_if_present(cfg)?,
+        // validator_node: ValidatorNodeConfig::convert_if_present(cfg)?,
         mining_pool_address,
         mining_wallet_address,
         mining_worker_name,
@@ -880,7 +875,6 @@ fn convert_node_config(
         metrics,
         base_node_use_libtor,
         console_wallet_use_libtor,
-        merge_mining_config,
         blockchain_track_reorgs,
     })
 }
@@ -926,133 +920,133 @@ where
         keys.join(", ")
     )))
 }
-
-// Clippy thinks "socks5" is not lowercase ...?
-#[allow(clippy::match_str_case_mismatch)]
-fn network_transport_config(
-    cfg: &Config,
-    mut application: ApplicationType,
-    network: &str,
-) -> Result<CommsTransport, ConfigurationError> {
-    const P2P_APPS: &[ApplicationType] = &[ApplicationType::BaseNode, ApplicationType::ConsoleWallet];
-    if !P2P_APPS.contains(&application) {
-        // TODO: If/when we split the configs by app, this hack can be removed
-        //       This removed the need to setup defaults for apps that dont use the network,
-        //       assuming base node has been set up
-        application = ApplicationType::BaseNode;
-    }
-
-    let get_conf_str = |key| {
-        cfg.get_str(key)
-            .map_err(|err| ConfigurationError::new(key, None, &err.to_string()))
-    };
-
-    let get_conf_multiaddr = |key| {
-        let path_str = get_conf_str(key)?;
-        path_str
-            .parse::<Multiaddr>()
-            .map_err(|err| ConfigurationError::new(key, Some(path_str), &err.to_string()))
-    };
-
-    let app_str = application.as_config_str();
-    let transport_key = config_string(app_str, network, "transport");
-    let transport = get_conf_str(&transport_key)?;
-
-    match transport.to_lowercase().as_str() {
-        "tcp" => {
-            let key = config_string(app_str, network, "tcp_listener_address");
-            let listener_address = get_conf_multiaddr(&key)?;
-            let key = config_string(app_str, network, "tcp_tor_socks_address");
-            let tor_socks_address = get_conf_multiaddr(&key).ok();
-            let key = config_string(app_str, network, "tcp_tor_socks_auth");
-            let tor_socks_auth = get_conf_str(&key).ok().and_then(|auth_str| auth_str.parse().ok());
-
-            Ok(CommsTransport::Tcp {
-                listener_address,
-                tor_socks_auth,
-                tor_socks_address,
-            })
-        },
-        "tor" => {
-            let key = config_string(app_str, network, "tor_control_address");
-            let control_server_address = get_conf_multiaddr(&key)?;
-
-            let key = config_string(app_str, network, "tor_control_auth");
-            let auth_str = get_conf_str(&key)?;
-            let auth = auth_str
-                .parse()
-                .map_err(|err: String| ConfigurationError::new(&key, Some(auth_str), &err))?;
-
-            let key = config_string(app_str, network, "tor_forward_address");
-            let forward_address = get_conf_multiaddr(&key)?;
-            let key = config_string(app_str, network, "tor_onion_port");
-            let onion_port = cfg
-                .get::<NonZeroU16>(&key)
-                .map_err(|err| ConfigurationError::new(&key, None, &err.to_string()))?;
-
-            // TODO
-            let key = config_string(app_str, network, "tor_proxy_bypass_addresses");
-            let tor_proxy_bypass_addresses = optional(cfg.get_array(&key))?
-                .unwrap_or_default()
-                .into_iter()
-                .map(|v| {
-                    v.into_str()
-                        .map_err(|err| ConfigurationError::new(&key, None, &err.to_string()))
-                        .and_then(|s| {
-                            Multiaddr::from_str(&s)
+// // Clippy thinks "socks5" is not lowercase ...?
+// #[allow(clippy::match_str_case_mismatch)]
+// fn network_transport_config(
+//     cfg: &Config,
+//     mut application: ApplicationType,
+//     network: &str,
+// ) -> Result<CommsTransport, ConfigurationError> {
+//     const P2P_APPS: &[ApplicationType] = &[ApplicationType::BaseNode, ApplicationType::ConsoleWallet];
+//     if !P2P_APPS.contains(&application) {
+//         // TODO: If/when we split the configs by app, this hack can be removed
+//         //       This removed the need to setup defaults for apps that dont use the network,
+//         //       assuming base node has been set up
+//         application = ApplicationType::BaseNode;
+//     }
+//
+//     let get_conf_str = |key| {
+//         cfg.get_str(key)
+//             .map_err(|err| ConfigurationError::new(key, None, &err.to_string()))
+//     };
+//
+//     let get_conf_multiaddr = |key| {
+//         let path_str = get_conf_str(key)?;
+//         path_str
+//             .parse::<Multiaddr>()
+//             .map_err(|err| ConfigurationError::new(key, Some(path_str), &err.to_string()))
+//     };
+//
+//     let app_str = application.as_config_str();
+//     let transport_key = config_string(app_str, network, "transport");
+//     let transport = get_conf_str(&transport_key)?;
+//
+//     match transport.to_lowercase().as_str() {
+//         "tcp" => {
+//             let key = config_string(app_str, network, "tcp_listener_address");
+//             let listener_address = get_conf_multiaddr(&key)?;
+//             let key = config_string(app_str, network, "tcp_tor_socks_address");
+//             let tor_socks_address = get_conf_multiaddr(&key).ok();
+//             let key = config_string(app_str, network, "tcp_tor_socks_auth");
+//             let tor_socks_auth = get_conf_str(&key).ok().and_then(|auth_str| auth_str.parse().ok());
+//
+//             todo!()
+//             // Ok(CommsTransport::Tcp {
+//             //     listener_address,
+//             //     tor_socks_auth,
+//             //     tor_socks_address,
+//             // })
+//         },
+//         "tor" => {
+//             let key = config_string(app_str, network, "tor_control_address");
+//             let control_server_address = get_conf_multiaddr(&key)?;
+//
+//             let key = config_string(app_str, network, "tor_control_auth");
+//             let auth_str = get_conf_str(&key)?;
+//             let auth = auth_str
+//                 .parse()
+//                 .map_err(|err: String| ConfigurationError::new(&key, Some(auth_str), &err))?;
+//
+//             let key = config_string(app_str, network, "tor_forward_address");
+//             let forward_address = get_conf_multiaddr(&key)?;
+//             let key = config_string(app_str, network, "tor_onion_port");
+//             let onion_port = cfg
+//                 .get::<NonZeroU16>(&key)
+//                 .map_err(|err| ConfigurationError::new(&key, None, &err.to_string()))?;
+//
+//             // TODO
+//             let key = config_string(app_str, network, "tor_proxy_bypass_addresses");
+//             let tor_proxy_bypass_addresses = optional(cfg.get_array(&key))?
+//                 .unwrap_or_default()
+//                 .into_iter()
+//                 .map(|v| {
+//                     v.into_str()
+//                         .map_err(|err| ConfigurationError::new(&key, None, &err.to_string()))
+//                         .and_then(|s| {
+//                             Multiaddr::from_str(&s)
                                 .map_err(|err| ConfigurationError::new(&key, Some(s), &err.to_string()))
-                        })
-                })
-                .collect::<Result<_, _>>()?;
-
-            let key = config_string(app_str, network, "tor_socks_address_override");
-            let socks_address_override = match get_conf_str(&key).ok() {
-                Some(addr) => Some(
-                    addr.parse::<Multiaddr>()
-                        .map_err(|err| ConfigurationError::new(&key, Some(addr), &err.to_string()))?,
-                ),
-                None => None,
-            };
-
-            let key = config_string(app_str, network, "tor_proxy_bypass_for_outbound_tcp");
-            let tor_proxy_bypass_for_outbound_tcp = optional(cfg.get_bool(&key))?.unwrap_or(false);
-
-            Ok(CommsTransport::TorHiddenService {
-                control_server_address,
-                auth,
-                socks_address_override,
-                forward_address,
-                onion_port,
-                tor_proxy_bypass_addresses,
-                tor_proxy_bypass_for_outbound_tcp,
-            })
-        },
-        "socks5" => {
-            let key = config_string(app_str, network, "socks5_proxy_address");
-            let proxy_address = get_conf_multiaddr(&key)?;
-
-            let key = config_string(app_str, network, "socks5_auth");
-            let auth_str = get_conf_str(&key)?;
-            let auth = auth_str
-                .parse()
-                .map_err(|err: String| ConfigurationError::new(&key, Some(auth_str), &err))?;
-
-            let key = config_string(app_str, network, "socks5_listener_address");
-            let listener_address = get_conf_multiaddr(&key)?;
-
-            Ok(CommsTransport::Socks5 {
-                proxy_address,
-                listener_address,
-                auth,
-            })
-        },
-        t => Err(ConfigurationError::new(
-            &transport_key,
+//                         })
+//                 })
+//                 .collect::<Result<_, _>>()?;
+//
+//             let key = config_string(app_str, network, "tor_socks_address_override");
+//             let socks_address_override = match get_conf_str(&key).ok() {
+//                 Some(addr) => Some(
+//                     addr.parse::<Multiaddr>()
+//                         .map_err(|err| ConfigurationError::new(&key, Some(addr), &err.to_string()))?,
+//                 ),
+//                 None => None,
+//             };
+//
+//             let key = config_string(app_str, network, "tor_proxy_bypass_for_outbound_tcp");
+//             let tor_proxy_bypass_for_outbound_tcp = optional(cfg.get_bool(&key))?.unwrap_or(false);
+//             todo!()
+//             // Ok(CommsTransport::TorHiddenService {
+//             //     control_server_address,
+//             //     auth,
+//             //     socks_address_override,
+//             //     forward_address,
+//             //     onion_port,
+//             //     tor_proxy_bypass_addresses,
+//             //     tor_proxy_bypass_for_outbound_tcp,
+//             // })
+//         },
+//         "socks5" => {
+//             let key = config_string(app_str, network, "socks5_proxy_address");
+//             let proxy_address = get_conf_multiaddr(&key)?;
+//
+//             let key = config_string(app_str, network, "socks5_auth");
+//             let auth_str = get_conf_str(&key)?;
+//             let auth = auth_str
+//                 .parse()
+//                 .map_err(|err: String| ConfigurationError::new(&key, Some(auth_str), &err))?;
+//
+//             let key = config_string(app_str, network, "socks5_listener_address");
+//             let listener_address = get_conf_multiaddr(&key)?;
+//             todo!()
+//             // Ok(CommsTransport::Socks5 {
+//             //     proxy_address,
+//             //     listener_address,
+//             //     auth,
+//             // })
+//         },
+//         t => Err(ConfigurationError::new(
+//             &transport_key,
             Some(t.to_string()),
-            &format!("Invalid transport type '{}'", t),
-        )),
-    }
-}
+//             &format!("Invalid transport type '{}'", t),
+//         )),
+//     }
+// }
 
 /// Returns prefix.network.key as a String
 fn config_string(prefix: &str, network: &str, key: &str) -> String {
@@ -1060,29 +1054,8 @@ fn config_string(prefix: &str, network: &str, key: &str) -> String {
 }
 
 //---------------------------------------------      Database type        ------------------------------------------//
-#[derive(Debug, Clone)]
-pub enum DatabaseType {
-    LMDB(PathBuf),
-    Memory,
-}
 
 //---------------------------------------------     Network Transport     ------------------------------------------//
-#[derive(Clone)]
-pub enum TorControlAuthentication {
-    None,
-    Password(String),
-}
-
-fn parse_key_value(s: &str, split_chr: char) -> (String, Option<&str>) {
-    let mut parts = s.splitn(2, split_chr);
-    (
-        parts
-            .next()
-            .expect("splitn always emits at least one part")
-            .to_lowercase(),
-        parts.next(),
-    )
-}
 
 /// Interpret a string as either a socket address (first) or a multiaddr format string.
 /// If the former, it gets converted into a MultiAddr before being returned.
@@ -1095,98 +1068,36 @@ pub fn socket_or_multi(addr: &str) -> Result<Multiaddr, Error> {
         .or_else(|_| addr.parse::<Multiaddr>())
 }
 
-impl FromStr for TorControlAuthentication {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (auth_type, maybe_value) = parse_key_value(s, '=');
-        match auth_type.as_str() {
-            "none" => Ok(TorControlAuthentication::None),
-            "password" => {
-                let password = maybe_value.ok_or_else(|| {
-                    "Invalid format for 'password' tor authentication type. It should be in the format \
-                     'password=xxxxxx'."
-                        .to_string()
-                })?;
-                Ok(TorControlAuthentication::Password(password.to_string()))
-            },
-            s => Err(format!("Invalid tor auth type '{}'", s)),
-        }
-    }
-}
-
-impl fmt::Debug for TorControlAuthentication {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use TorControlAuthentication::*;
-        match self {
-            None => write!(f, "None"),
-            Password(_) => write!(f, "Password(...)"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SocksAuthentication {
-    None,
-    UsernamePassword(String, String),
-}
-
-impl FromStr for SocksAuthentication {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (auth_type, maybe_value) = parse_key_value(s, '=');
-        match auth_type.as_str() {
-            "none" => Ok(SocksAuthentication::None),
-            "username_password" => {
-                let (username, password) = maybe_value
-                    .and_then(|value| {
-                        let (un, pwd) = parse_key_value(value, ':');
-                        // If pwd is None, return None
-                        pwd.map(|p| (un, p))
-                    })
-                    .ok_or_else(|| {
-                        "Invalid format for 'username-password' socks authentication type. It should be in the format \
-                         'username_password=my_username:xxxxxx'."
-                            .to_string()
-                    })?;
-                Ok(SocksAuthentication::UsernamePassword(username, password.to_string()))
-            },
-            s => Err(format!("Invalid tor auth type '{}'", s)),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum CommsTransport {
-    /// Use TCP to join the Tari network. This transport can only communicate with TCP/IP addresses, so peers with
-    /// e.g. tor onion addresses will not be contactable.
-    Tcp {
-        listener_address: Multiaddr,
-        tor_socks_address: Option<Multiaddr>,
-        tor_socks_auth: Option<SocksAuthentication>,
-    },
-    /// Configures the node to run over a tor hidden service using the Tor proxy. This transport recognises ip/tcp,
-    /// onion v2, onion v3 and DNS addresses.
-    TorHiddenService {
-        /// The address of the control server
-        control_server_address: Multiaddr,
-        socks_address_override: Option<Multiaddr>,
-        /// The address used to receive proxied traffic from the tor proxy to the Tari node. This port must be
-        /// available
-        forward_address: Multiaddr,
-        auth: TorControlAuthentication,
-        onion_port: NonZeroU16,
-        tor_proxy_bypass_addresses: Vec<Multiaddr>,
-        tor_proxy_bypass_for_outbound_tcp: bool,
-    },
-    /// Use a SOCKS5 proxy transport. This transport recognises any addresses supported by the proxy.
-    Socks5 {
-        proxy_address: Multiaddr,
-        auth: SocksAuthentication,
-        listener_address: Multiaddr,
-    },
-}
+// #[derive(Debug, Clone)]
+// pub enum CommsTransport {
+//     /// Use TCP to join the Tari network. This transport can only communicate with TCP/IP addresses, so peers with
+//     /// e.g. tor onion addresses will not be contactable.
+//     Tcp {
+//         listener_address: Multiaddr,
+//         tor_socks_address: Option<Multiaddr>,
+//         tor_socks_auth: Option<SocksAuthentication>,
+//     },
+//     /// Configures the node to run over a tor hidden service using the Tor proxy. This transport recognises ip/tcp,
+//     /// onion v2, onion v3 and DNS addresses.
+//     TorHiddenService {
+//         /// The address of the control server
+//         control_server_address: Multiaddr,
+//         socks_address_override: Option<Multiaddr>,
+//         /// The address used to receive proxied traffic from the tor proxy to the Tari node. This port must be
+//         /// available
+//         forward_address: Multiaddr,
+//         auth: TorControlAuthentication,
+//         onion_port: NonZeroU16,
+//         tor_proxy_bypass_addresses: Vec<Multiaddr>,
+//         tor_proxy_bypass_for_outbound_tcp: bool,
+//     },
+//     /// Use a SOCKS5 proxy transport. This transport recognises any addresses supported by the proxy.
+//     Socks5 {
+//         proxy_address: Multiaddr,
+//         auth: SocksAuthentication,
+//         listener_address: Multiaddr,
+//     },
+// }
 
 #[derive(Debug, Clone)]
 pub struct MetricsConfig {

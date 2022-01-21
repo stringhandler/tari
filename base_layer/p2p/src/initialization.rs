@@ -35,7 +35,7 @@ use futures::future;
 use lmdb_zero::open;
 use log::*;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use tari_common::{configuration::Network, DnsNameServer};
+use tari_common::types::{DnsNameServer, Network};
 use tari_comms::{
     backoff::ConstantBackoff,
     multiaddr::Multiaddr,

@@ -23,7 +23,7 @@
 use std::{collections::HashMap, ops::Add};
 
 use chrono::{DateTime, Duration, Utc};
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_crypto::{script, tari_utilities::epoch_time::EpochTime};
 
 use crate::{

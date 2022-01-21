@@ -20,13 +20,15 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use futures::future::Either;
 use log::*;
-use tari_common::{exit_codes::ExitCodes, CommsTransport, GlobalConfig, SocksAuthentication, TorControlAuthentication};
+use tari_common::types::SocksAuthentication;
+// use tari_common::{exit_codes::ExitCodes, CommsTransport, GlobalConfig, SocksAuthentication, TorControlAuthentication};
 use tari_common_types::{emoji::EmojiId, types::BlockHash};
 use tari_comms::{
+    multiaddr::{Multiaddr, Protocol},
     peer_manager::NodeId,
     socks,
     tor,
@@ -42,87 +44,87 @@ use tokio::{runtime, runtime::Runtime};
 use crate::identity_management::load_from_json;
 
 pub const LOG_TARGET: &str = "tari::application";
-
-/// Creates a transport type from the given configuration
-///
-/// ## Paramters
-/// `config` - The reference to the configuration in which to set up the comms stack, see [GlobalConfig]
-///
-/// ##Returns
-/// TransportType based on the configuration
-pub fn create_transport_type(config: &GlobalConfig) -> TransportType {
-    debug!(target: LOG_TARGET, "Transport is set to '{:?}'", config.comms_transport);
-
-    match config.comms_transport.clone() {
-        CommsTransport::Tcp {
-            listener_address,
-            tor_socks_address,
-            tor_socks_auth,
-        } => TransportType::Tcp {
-            listener_address,
-            tor_socks_config: tor_socks_address.map(|proxy_address| SocksConfig {
-                proxy_address,
-                authentication: tor_socks_auth.map(convert_socks_authentication).unwrap_or_default(),
-                proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
-            }),
-        },
-        CommsTransport::TorHiddenService {
-            control_server_address,
-            socks_address_override,
-            forward_address,
-            auth,
-            onion_port,
-            tor_proxy_bypass_addresses,
-            tor_proxy_bypass_for_outbound_tcp,
-        } => {
-            let identity = Some(&config.base_node_tor_identity_file)
-                .filter(|p| p.exists())
-                .and_then(|p| {
-                    // If this fails, we can just use another address
-                    load_from_json::<_, TorIdentity>(p).ok()
-                });
-            debug!(
-                target: LOG_TARGET,
-                "Tor identity at path '{}' {:?}",
-                config.base_node_tor_identity_file.to_string_lossy(),
-                identity
-                    .as_ref()
-                    .map(|ident| format!("loaded for address '{}.onion'", ident.service_id))
-                    .or_else(|| Some("not found".to_string()))
-                    .unwrap()
-            );
-
-            let forward_addr = multiaddr_to_socketaddr(&forward_address).expect("Invalid tor forward address");
-            TransportType::Tor(TorConfig {
-                control_server_addr: control_server_address,
-                control_server_auth: {
-                    match auth {
-                        TorControlAuthentication::None => tor::Authentication::None,
-                        TorControlAuthentication::Password(password) => tor::Authentication::HashedPassword(password),
-                    }
-                },
-                identity: identity.map(Box::new),
-                port_mapping: (onion_port, forward_addr).into(),
-                socks_address_override,
-                socks_auth: socks::Authentication::None,
-                tor_proxy_bypass_addresses,
-                tor_proxy_bypass_for_outbound_tcp,
-            })
-        },
-        CommsTransport::Socks5 {
-            proxy_address,
-            listener_address,
-            auth,
-        } => TransportType::Socks {
-            socks_config: SocksConfig {
-                proxy_address,
-                authentication: convert_socks_authentication(auth),
-                proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
-            },
-            listener_address,
-        },
-    }
-}
+// /// Creates a transport type from the given configuration
+// ///
+// /// ## Paramters
+// /// `config` - The reference to the configuration in which to set up the comms stack, see [GlobalConfig]
+// ///
+// /// ##Returns
+// /// TransportType based on the configuration
+// pub fn create_transport_type(config: &GlobalConfig) -> TransportType {
+//     todo!()
+//     // debug!(target: LOG_TARGET, "Transport is set to '{:?}'", config.comms_transport);
+//     //
+//     // match config.comms_transport.clone() {
+//     //     CommsTransport::Tcp {
+//     //         listener_address,
+//     //         tor_socks_address,
+//     //         tor_socks_auth,
+//     //     } => TransportType::Tcp {
+//     //         listener_address,
+//     //         tor_socks_config: tor_socks_address.map(|proxy_address| SocksConfig {
+//     //             proxy_address,
+//     //             authentication: tor_socks_auth.map(convert_socks_authentication).unwrap_or_default(),
+//     //             proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
+//     //         }),
+//     //     },
+//     //     CommsTransport::TorHiddenService {
+//     //         control_server_address,
+//     //         socks_address_override,
+//     //         forward_address,
+//     //         auth,
+//     //         onion_port,
+//     //         tor_proxy_bypass_addresses,
+//     //         tor_proxy_bypass_for_outbound_tcp,
+//     //     } => {
+//     //         let identity = Some(&config.base_node_tor_identity_file)
+//     //             .filter(|p| p.exists())
+//     //             .and_then(|p| {
+//     //                 // If this fails, we can just use another address
+//     //                 load_from_json::<_, TorIdentity>(p).ok()
+//     //             });
+//     //         debug!(
+//     //             target: LOG_TARGET,
+//     //             "Tor identity at path '{}' {:?}",
+//     //             config.base_node_tor_identity_file.to_string_lossy(),
+//     //             identity
+//     //                 .as_ref()
+//     //                 .map(|ident| format!("loaded for address '{}.onion'", ident.service_id))
+//     //                 .or_else(|| Some("not found".to_string()))
+//     //                 .unwrap()
+//     //         );
+//     //
+//     //         let forward_addr = multiaddr_to_socketaddr(&forward_address).expect("Invalid tor forward address");
+//     //         TransportType::Tor(TorConfig {
+//     //             control_server_addr: control_server_address,
+//     //             control_server_auth: {
+//     //                 match auth {
+//     //                     TorControlAuthentication::None => tor::Authentication::None,
+//     //                     TorControlAuthentication::Password(password) =>
+//     // tor::Authentication::HashedPassword(password),                 }
+//     //             },
+//     //             identity: identity.map(Box::new),
+//     //             port_mapping: (onion_port, forward_addr).into(),
+//     //             socks_address_override,
+//     //             socks_auth: socks::Authentication::None,
+//     //             tor_proxy_bypass_addresses,
+//     //             tor_proxy_bypass_for_outbound_tcp,
+//     //         })
+//     //     },
+//     //     CommsTransport::Socks5 {
+//     //         proxy_address,
+//     //         listener_address,
+//     //         auth,
+//     //     } => TransportType::Socks {
+//     //         socks_config: SocksConfig {
+//     //             proxy_address,
+//     //             authentication: convert_socks_authentication(auth),
+//     //             proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
+//     //         },
+//     //         listener_address,
+//     //     },
+//     // }
+// }
 
 /// Converts one socks authentication struct into another
 /// ## Parameters
@@ -140,27 +142,10 @@ pub fn convert_socks_authentication(auth: SocksAuthentication) -> socks::Authent
 }
 
 /// Sets up the tokio runtime based on the configuration
-/// ## Parameters
-/// `config` - The configuration  of the base node
-///
 /// ## Returns
 /// A result containing the runtime on success, string indicating the error on failure
-pub fn setup_runtime(config: &GlobalConfig) -> Result<Runtime, ExitCodes> {
+pub fn setup_runtime() -> Result<Runtime, ExitCodes> {
     let mut builder = runtime::Builder::new_multi_thread();
-
-    if let Some(core_threads) = config.core_threads {
-        info!(
-            target: LOG_TARGET,
-            "Configuring the node to run on up to {} core threads.",
-            config
-                .core_threads
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_else(|| "<num cores>".to_string()),
-        );
-        builder.worker_threads(core_threads);
-    }
-
     builder.enable_all().build().map_err(|e| {
         let msg = format!("There was an error while building the node runtime. {}", e);
         ExitCodes::UnknownError(msg)
@@ -191,4 +176,34 @@ pub fn either_to_node_id(either: Either<CommsPublicKey, NodeId>) -> NodeId {
         Either::Left(pk) => NodeId::from_public_key(&pk),
         Either::Right(n) => n,
     }
+}
+
+pub fn prompt(question: &str) -> bool {
+    println!("{}", question);
+    let mut input = "".to_string();
+    io::stdin().read_line(&mut input).unwrap();
+    let input = input.trim().to_lowercase();
+    input == "y" || input.is_empty()
+}
+
+pub fn get_local_ip() -> Option<Multiaddr> {
+    use std::net::IpAddr;
+
+    get_if_addrs::get_if_addrs().ok().and_then(|if_addrs| {
+        if_addrs
+            .into_iter()
+            .find(|if_addr| !if_addr.is_loopback())
+            .map(|if_addr| {
+                let mut addr = Multiaddr::empty();
+                match if_addr.ip() {
+                    IpAddr::V4(ip) => {
+                        addr.push(Protocol::Ip4(ip));
+                    },
+                    IpAddr::V6(ip) => {
+                        addr.push(Protocol::Ip6(ip));
+                    },
+                }
+                addr
+            })
+    })
 }

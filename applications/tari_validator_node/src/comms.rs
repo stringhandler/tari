@@ -28,7 +28,7 @@ use tari_app_utilities::{
     identity_management::load_from_json,
     utilities::convert_socks_authentication,
 };
-use tari_common::{exit_codes::ExitCodes, CommsTransport, GlobalConfig, TorControlAuthentication};
+use tari_common::{exit_codes::ExitCodes, types::TorControlAuthentication};
 use tari_comms::{
     protocol::rpc::RpcServer,
     socks,

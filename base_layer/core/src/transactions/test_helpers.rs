@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use rand::rngs::OsRng;
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_common_types::types::{Commitment, CommitmentFactory, PrivateKey, PublicKey, Signature};
 use tari_crypto::{
     commitment::HomomorphicCommitmentFactory,

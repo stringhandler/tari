@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use log::*;
-use tari_common::{configuration::Network, DatabaseType, GlobalConfig};
+use tari_common::{types::Network, DatabaseType};
 use tari_comms::{peer_manager::NodeIdentity, protocol::rpc::RpcServerHandle, CommsNode};
 use tari_comms_dht::Dht;
 use tari_core::{

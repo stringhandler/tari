@@ -24,7 +24,7 @@ use std::io;
 
 use hex::FromHexError;
 use hyper::header::InvalidHeaderValue;
-use tari_common::ConfigurationError;
+use tari_common::configuration::ConfigurationError;
 use tari_core::{proof_of_work::monero_rx::MergeMineError, transactions::CoinbaseBuildError};
 use thiserror::Error;
 use tonic::transport;

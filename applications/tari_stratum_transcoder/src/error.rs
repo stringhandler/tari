@@ -23,7 +23,7 @@
 use std::io;
 
 use hex::FromHexError;
-use tari_common::ConfigurationError;
+use tari_common::configuration::ConfigurationError;
 use tari_core::transactions::CoinbaseBuildError;
 use thiserror::Error;
 use tonic::transport;

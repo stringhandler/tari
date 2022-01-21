@@ -23,7 +23,7 @@
 
 use std::{fs, fs::File, io::Write, path::Path};
 
-use crate::configuration::bootstrap::ApplicationType;
+use crate::types::ApplicationType;
 
 /// Set up application-level logging using the Log4rs configuration file specified in
 pub fn initialize_logging(config_file: &Path, base_path: &Path) -> bool {

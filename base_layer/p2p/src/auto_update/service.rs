@@ -24,7 +24,7 @@ use std::{env::consts, time::Duration};
 
 use futures::{future::Either, stream, StreamExt};
 use log::*;
-use tari_common::configuration::bootstrap::ApplicationType;
+use tari_common::types::ApplicationType;
 use tari_service_framework::{async_trait, ServiceInitializationError, ServiceInitializer, ServiceInitializerContext};
 use tokio::{
     sync::{mpsc, oneshot, watch},

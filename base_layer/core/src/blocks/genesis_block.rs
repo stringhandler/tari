@@ -23,7 +23,7 @@
 use std::sync::Arc;
 
 use chrono::DateTime;
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use tari_common_types::types::{BulletRangeProof, Commitment, PrivateKey, PublicKey, Signature, BLOCK_HASH_LENGTH};
 use tari_crypto::{
     script::TariScript,

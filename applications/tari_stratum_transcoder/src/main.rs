@@ -38,65 +38,64 @@ use hyper::{service::make_service_fn, Server};
 use proxy::{StratumTranscoderProxyConfig, StratumTranscoderProxyService};
 use structopt::StructOpt;
 use tari_app_grpc::tari_rpc as grpc;
-use tari_common::{configuration::bootstrap::ApplicationType, ConfigBootstrap, GlobalConfig};
 use tokio::time::Duration;
 
 use crate::error::StratumTranscoderProxyError;
 
 #[tokio::main]
 async fn main() -> Result<(), StratumTranscoderProxyError> {
-    let config = initialize()?;
-
-    let config = StratumTranscoderProxyConfig::try_from(config)?;
-    let addr = config.transcoder_host_address;
-    let client = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(10))
-        .pool_max_idle_per_host(25)
-        .build()
-        .map_err(StratumTranscoderProxyError::ReqwestError)?;
-    let base_node_client =
-        grpc::base_node_client::BaseNodeClient::connect(format!("http://{}", config.grpc_base_node_address)).await?;
-    let wallet_client =
-        grpc::wallet_client::WalletClient::connect(format!("http://{}", config.grpc_console_wallet_address)).await?;
-    let miningcore_service = StratumTranscoderProxyService::new(config, client, base_node_client, wallet_client);
-    let service = make_service_fn(|_conn| future::ready(Result::<_, Infallible>::Ok(miningcore_service.clone())));
-
-    match Server::try_bind(&addr) {
-        Ok(builder) => {
-            println!("Listening on {}...", addr);
-            builder.serve(service).await?;
-            Ok(())
-        },
-        Err(err) => {
-            println!("Fatal: Cannot bind to '{}'.", addr);
-            println!("It may be part of a Port Exclusion Range. Please try to use another port for the");
-            println!("'proxy_host_address' in 'config/config.toml' and for the applicable XMRig '[pools][url]' or");
-            println!("[pools][self-select]' config setting that can be found  in 'config/xmrig_config_***.json' or");
-            println!("'<xmrig folder>/config.json'.");
-            println!();
-            Err(err.into())
-        },
-    }
+    // let config = initialize()?;
+    todo!();
+    // let config = StratumTranscoderProxyConfig::try_from(config)?;
+    // let addr = config.transcoder_host_address;
+    // let client = reqwest::Client::builder()
+    //     .connect_timeout(Duration::from_secs(5))
+    //     .timeout(Duration::from_secs(10))
+    //     .pool_max_idle_per_host(25)
+    //     .build()
+    //     .map_err(StratumTranscoderProxyError::ReqwestError)?;
+    // let base_node_client =
+    //     grpc::base_node_client::BaseNodeClient::connect(format!("http://{}", config.grpc_base_node_address)).await?;
+    // let wallet_client =
+    //     grpc::wallet_client::WalletClient::connect(format!("http://{}", config.grpc_console_wallet_address)).await?;
+    // let miningcore_service = StratumTranscoderProxyService::new(config, client, base_node_client, wallet_client);
+    // let service = make_service_fn(|_conn| future::ready(Result::<_, Infallible>::Ok(miningcore_service.clone())));
+    //
+    // match Server::try_bind(&addr) {
+    //     Ok(builder) => {
+    //         println!("Listening on {}...", addr);
+    //         builder.serve(service).await?;
+    //         Ok(())
+    //     },
+    //     Err(err) => {
+    //         println!("Fatal: Cannot bind to '{}'.", addr);
+    //         println!("It may be part of a Port Exclusion Range. Please try to use another port for the");
+    //         println!("'proxy_host_address' in 'config/config.toml' and for the applicable XMRig '[pools][url]' or");
+    //         println!("[pools][self-select]' config setting that can be found  in 'config/xmrig_config_***.json' or");
+    //         println!("'<xmrig folder>/config.json'.");
+    //         println!();
+    //         Err(err.into())
+    //     },
+    // }
 }
 
-/// Loads the configuration and sets up logging
-fn initialize() -> Result<GlobalConfig, StratumTranscoderProxyError> {
-    // Parse and validate command-line arguments
-    let mut bootstrap = ConfigBootstrap::from_args();
-    // Check and initialize configuration files
-    let application_type = ApplicationType::StratumTranscoder;
-    bootstrap.init_dirs(application_type)?;
-
-    // Load and apply configuration file
-    let cfg = bootstrap.load_configuration()?;
-
-    #[cfg(feature = "envlog")]
-    let _ = env_logger::try_init();
-    // Initialise the logger
-    #[cfg(not(feature = "envlog"))]
-    bootstrap.initialize_logging()?;
-
-    let cfg = GlobalConfig::convert_from(application_type, cfg, bootstrap.network)?;
-    Ok(cfg)
-}
+// /// Loads the configuration and sets up logging
+// fn initialize() -> Result<GlobalConfig, StratumTranscoderProxyError> {
+//     // Parse and validate command-line arguments
+//     let mut bootstrap = ConfigBootstrap::from_args();
+//     // Check and initialize configuration files
+//     let application_type = ApplicationType::StratumTranscoder;
+//     bootstrap.init_dirs(application_type)?;
+//
+//     // Load and apply configuration file
+//     let cfg = bootstrap.load_configuration()?;
+//
+//     #[cfg(feature = "envlog")]
+//     let _ = env_logger::try_init();
+//     // Initialise the logger
+//     #[cfg(not(feature = "envlog"))]
+//     bootstrap.initialize_logging()?;
+//
+//     let cfg = GlobalConfig::convert_from(application_type, cfg, bootstrap.network)?;
+//     Ok(cfg)
+// }

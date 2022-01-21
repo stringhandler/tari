@@ -39,7 +39,7 @@ use pgp::Deserializable;
 use reqwest::IntoUrl;
 // Re-exports of foreign types used in public interface
 pub use semver::Version;
-use tari_common::{configuration::bootstrap::ApplicationType, DnsNameServer};
+use tari_common::types::{ApplicationType, DnsNameServer};
 use tari_utilities::hex::Hex;
 pub use trust_dns_client::rr::dnssec::TrustAnchor;
 

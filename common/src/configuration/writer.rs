@@ -67,7 +67,7 @@
 //! ```
 use config::Config;
 
-use crate::{configuration::has_config_prefix::HasConfigPrefix, ConfigurationError};
+use crate::configuration::{has_config_prefix::HasConfigPrefix, ConfigurationError};
 
 /// Configuration writer based on ConfigPath selectors
 ///

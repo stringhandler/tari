@@ -58,11 +58,12 @@ use std::{
 
 use structopt::StructOpt;
 
-use super::utils::{config_installer, load_configuration};
+use super::utils::config_installer;
 use crate::{
     dir_utils,
     initialize_logging,
     logging,
+    types::ApplicationType,
     DEFAULT_BASE_NODE_LOG_CONFIG,
     DEFAULT_CONFIG,
     DEFAULT_MERGE_MINING_PROXY_LOG_CONFIG,
@@ -276,36 +277,19 @@ impl ConfigBootstrap {
         }
 
         if !self.config.exists() {
-            let install = if !self.init {
-                prompt("Config file does not exist. We can create a default one for you now, or you can say 'no' here, \
-                and generate a customised one at https://config.tari.com.\n\
-                Would you like to try the default configuration (Y/n)?")
-            } else {
-                true
-            };
-
-            if install {
-                println!(
-                    "Installing new config file at {}",
-                    self.config.to_str().unwrap_or("[??]")
-                );
-                install_configuration(application_type, &self.config, config_installer);
-            }
+            println!(
+                "Installing new config file at {}",
+                self.config.to_str().unwrap_or("[??]")
+            );
+            install_configuration(application_type, &self.config, config_installer);
         }
 
         if !self.log_config.exists() {
-            let install = if !self.init {
-                prompt("Logging configuration file does not exist. Would you like to create a new one (Y/n)?")
-            } else {
-                true
-            };
-            if install {
-                println!(
-                    "Installing new logfile configuration at {}",
-                    self.log_config.to_str().unwrap_or("[??]")
-                );
-                install_configuration(application_type, &self.log_config, logging::log_config_installer)
-            }
+            println!(
+                "Installing new logfile configuration at {}",
+                self.log_config.to_str().unwrap_or("[??]")
+            );
+            install_configuration(application_type, &self.log_config, logging::log_config_installer)
         };
         Ok(())
     }
@@ -322,16 +306,9 @@ impl ConfigBootstrap {
 
     /// Load configuration from files located based on supplied CLI arguments
     pub fn load_configuration(&self) -> Result<config::Config, String> {
-        load_configuration(self)
+        todo!()
+        // load_configuration(self)
     }
-}
-
-pub fn prompt(question: &str) -> bool {
-    println!("{}", question);
-    let mut input = "".to_string();
-    io::stdin().read_line(&mut input).unwrap();
-    let input = input.trim().to_lowercase();
-    input == "y" || input.is_empty()
 }
 
 pub fn install_configuration<F>(application_type: ApplicationType, path: &Path, installer: F)
@@ -342,66 +319,6 @@ where F: Fn(ApplicationType, &Path) -> Result<(), std::io::Error> {
             path.to_str().unwrap_or("?"),
             e
         )
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApplicationType {
-    BaseNode,
-    ConsoleWallet,
-    MergeMiningProxy,
-    MiningNode,
-    StratumTranscoder,
-    ValidatorNode,
-}
-
-impl ApplicationType {
-    pub const fn as_str(&self) -> &'static str {
-        use ApplicationType::*;
-        match self {
-            BaseNode => "Tari Base Node",
-            ConsoleWallet => "Tari Console Wallet",
-            MergeMiningProxy => "Tari Merge Mining Proxy",
-            MiningNode => "Tari Mining Node",
-            ValidatorNode => "Digital Assets Network Validator Node",
-            StratumTranscoder => "Tari Stratum Transcoder",
-        }
-    }
-
-    pub const fn as_config_str(&self) -> &'static str {
-        use ApplicationType::*;
-        match self {
-            BaseNode => "base_node",
-            ConsoleWallet => "wallet",
-            MergeMiningProxy => "merge_mining_proxy",
-            MiningNode => "miner",
-            StratumTranscoder => "stratum-transcoder",
-            ValidatorNode => "validator-node",
-        }
-    }
-}
-
-impl FromStr for ApplicationType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use ApplicationType::*;
-        match s {
-            "base-node" | "base_node" => Ok(BaseNode),
-            "console-wallet" | "console_wallet" => Ok(ConsoleWallet),
-            "mm-proxy" | "mm_proxy" => Ok(MergeMiningProxy),
-            "miner" => Ok(MiningNode),
-            "validator-node" => Ok(ValidatorNode),
-            "stratum-proxy" => Ok(StratumTranscoder),
-            _ => Err("Invalid ApplicationType".to_string()),
-        }
-    }
-}
-
-impl Display for ApplicationType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())?;
-        Ok(())
     }
 }
 

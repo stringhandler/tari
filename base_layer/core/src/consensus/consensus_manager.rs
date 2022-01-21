@@ -22,7 +22,7 @@
 
 use std::sync::Arc;
 
-use tari_common::configuration::Network;
+use tari_common::types::Network;
 use thiserror::Error;
 
 #[cfg(feature = "base_node")]

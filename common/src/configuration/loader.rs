@@ -19,7 +19,7 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
+
 //! # Application configuration
 //!
 //! Tari is using config crate which allows to extend config file with application level configs.
@@ -62,7 +62,10 @@ use std::{
 
 use config::Config;
 
-use crate::configuration::{error::ConfigurationError, has_config_prefix::HasConfigPrefix, Network};
+use crate::{
+    configuration::{error::ConfigurationError, has_config_prefix::HasConfigPrefix},
+    types::Network,
+};
 
 //-------------------------------------------    ConfigLoader trait    ------------------------------------------//
 
@@ -122,6 +125,8 @@ impl<C: HasNetworkConfigPrefix> HasConfigPrefix for C {
     }
 }
 
+pub struct ConfigLoader {}
+
 /// Configuration loader based on ConfigPath selectors
 ///
 /// ```
@@ -159,20 +164,13 @@ impl<C: HasNetworkConfigPrefix> HasConfigPrefix for C {
 /// let my_config = <MyNodeConfig as ConfigLoader>::load_from(&config).unwrap();
 /// assert_eq!(my_config.goodbye_message, "see you soon".to_string());
 /// ```
-pub trait ConfigLoader: HasConfigPrefix + for<'de> serde::de::Deserialize<'de> {
-    /// Try to load configuration from supplied Config by `main_key_prefix()`
-    /// with values overloaded from `overload_key_prefix()`.
-    ///
-    /// Default values will be taken from
-    /// - `#[serde(default="value")]` field attribute
-    /// - value defined in Config::set_default()
-    /// For automated inheritance of Default values use DefaultConfigLoader.
-    fn load_from(config: &Config) -> Result<Self, ConfigurationError> {
-        let merger = Self::merge_subconfig(config)?;
-        Ok(merger.get(Self::main_key_prefix())?)
-    }
+impl ConfigLoader {
+    // fn load_from(config: &Config) -> Result<T, ConfigurationError> {
+    //     // let merger = Self::merge_subconfig(config)?;
+    //     // Ok(merger.get(Self::main_key_prefix())?)
+    //     todo!()
+    // }
 }
-impl<C> ConfigLoader for C where C: HasConfigPrefix + for<'de> serde::de::Deserialize<'de> {}
 
 /// Configuration loader based on ConfigPath selectors with Defaults
 ///

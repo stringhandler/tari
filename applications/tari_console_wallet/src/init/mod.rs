@@ -25,8 +25,7 @@ use std::{fs, path::PathBuf, str::FromStr, sync::Arc};
 use log::*;
 use rpassword::prompt_password_stdout;
 use rustyline::Editor;
-use tari_app_utilities::utilities::create_transport_type;
-use tari_common::{exit_codes::ExitCodes, ConfigBootstrap, GlobalConfig};
+use tari_common::exit_codes::ExitCodes;
 use tari_comms::{
     multiaddr::Multiaddr,
     peer_manager::{Peer, PeerFeatures},

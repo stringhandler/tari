@@ -24,8 +24,8 @@ use std::{cmp, fs, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::anyhow;
 use log::*;
-use tari_app_utilities::{consts, identity_management, utilities::create_transport_type};
-use tari_common::{configuration::bootstrap::ApplicationType, GlobalConfig};
+use tari_app_utilities::{consts, identity_management};
+use tari_common::types::ApplicationType;
 use tari_comms::{peer_manager::Peer, protocol::rpc::RpcServer, NodeIdentity, UnspawnedCommsNode};
 use tari_comms_dht::{store_forward::SafConfig, DbConnectionUrl, Dht, DhtConfig};
 use tari_core::{

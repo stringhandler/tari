@@ -21,7 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use serde::{Deserialize, Serialize};
-use tari_common::{configuration::seconds, HasNetworkConfigPrefix};
+use tari_common::configuration::serialize::seconds;
 
 use crate::mempool::{reorg_pool::ReorgPoolConfig, unconfirmed_pool::UnconfirmedPoolConfig};
 
@@ -31,12 +31,11 @@ pub struct MempoolConfig {
     pub unconfirmed_pool: UnconfirmedPoolConfig,
     pub reorg_pool: ReorgPoolConfig,
 }
-
-impl HasNetworkConfigPrefix for MempoolConfig {
-    fn main_key_prefix() -> &'static str {
-        "mempool"
-    }
-}
+// impl HasNetworkConfigPrefix for MempoolConfig {
+//     fn main_key_prefix() -> &'static str {
+//         "mempool"
+//     }
+// }
 
 /// Configuration for the MempoolService.
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -56,12 +55,11 @@ impl Default for MempoolServiceConfig {
         }
     }
 }
-
-impl HasNetworkConfigPrefix for MempoolServiceConfig {
-    fn main_key_prefix() -> &'static str {
-        "mempool_service"
-    }
-}
+// impl HasNetworkConfigPrefix for MempoolServiceConfig {
+//     fn main_key_prefix() -> &'static str {
+//         "mempool_service"
+//     }
+// }
 
 #[cfg(test)]
 mod test {

@@ -28,7 +28,7 @@ use std::{
 
 use anyhow::anyhow;
 use futures::future;
-use tari_common::configuration::bootstrap::ApplicationType;
+use tari_common::types::ApplicationType;
 use tari_utilities::hex::{from_hex, Hex};
 
 use super::{error::AutoUpdateError, AutoUpdateConfig, Version};

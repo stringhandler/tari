@@ -85,17 +85,10 @@ pub mod exit_codes;
 #[macro_use]
 mod logging;
 pub mod configuration;
-pub use configuration::{
-    bootstrap::{install_configuration, ConfigBootstrap},
-    error::ConfigurationError,
-    global::{CommsTransport, DatabaseType, GlobalConfig, SocksAuthentication, TorControlAuthentication},
-    loader::{ConfigLoader, DefaultConfigLoader, HasNetworkConfigPrefix},
-    name_server::DnsNameServer,
-    utils::{config_installer, default_config, load_configuration},
-};
 mod dir_utils;
 pub use logging::initialize_logging;
 pub mod file_lock;
+pub mod types;
 
 pub const DEFAULT_CONFIG: &str = "config/config.toml";
 pub const DEFAULT_BASE_NODE_LOG_CONFIG: &str = "config/log4rs_base_node.yml";
