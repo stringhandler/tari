@@ -1,0 +1,43 @@
+syntax = "proto3";
+package tari.dan.tips.tip10001;
+
+
+service Tip10001 {
+  rpc Init(InitRequest) returns (Empty);
+  rpc CreateLimit(CreateLimitRequest) returns (Empty);
+  // Read interface
+  rpc ListLimits(ListLimitsRequest) returns(ListLimitsResponse);
+}
+
+message InitRequest{
+
+}
+
+message Empty {
+
+}
+
+message CreateLimitRequest {
+  Limit limit = 1;
+  bytes owner = 2;
+}
+
+message Limit {
+  bytes maker_asset_public_key =1;
+  uint64 maker_amount = 2;
+  bytes maker_nft_id = 3;
+  uint64 taker_amount_in_native = 4;
+  bytes ownership_proof = 5;
+  bytes hash = 6;
+}
+
+message ListLimitsRequest {
+  bytes asset_public_key = 1;
+  uint32 page = 2;
+  uint32 page_size = 3;
+}
+
+message ListLimitsResponse {
+  repeated Limit limits =1;
+  uint32 total = 2;
+}

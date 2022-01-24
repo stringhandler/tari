@@ -33,4 +33,7 @@ pub mod tips {
     pub mod tip721 {
         include!(concat!(env!("OUT_DIR"), "/tari.dan.tips.tip721.rs"));
     }
+    pub mod tip10001 {
+        include!(concat!(env!("OUT_DIR"), "/tari.dan.tips.tip10001.rs"));
+    }
 }
