@@ -24,7 +24,6 @@ use std::{fs, fs::File, io::BufReader, path::Path, sync::Arc, time::Duration};
 
 use futures::future::try_join_all;
 use log::*;
-use tari_common::{configuration::ValidatorNodeConfig, GlobalConfig};
 use tari_comms::{types::CommsPublicKey, NodeIdentity};
 use tari_comms_dht::Dht;
 use tari_crypto::tari_utilities::hex::Hex;

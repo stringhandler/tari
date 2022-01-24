@@ -28,7 +28,7 @@ use tari_app_utilities::{
     identity_management::load_from_json,
     utilities::convert_socks_authentication,
 };
-use tari_common::{exit_codes::ExitCodes, types::TorControlAuthentication};
+use tari_common::exit_codes::ExitCodes;
 use tari_comms::{
     protocol::rpc::RpcServer,
     socks,
@@ -55,20 +55,17 @@ use crate::p2p::create_validator_node_rpc_service;
 const LOG_TARGET: &str = "tari::validator_node::comms";
 
 pub async fn build_service_and_comms_stack(
-    config: &GlobalConfig,
+    p2p_config: &P2pConfig,
     shutdown: ShutdownSignal,
     node_identity: Arc<NodeIdentity>,
     mempool: MempoolServiceHandle,
     db_factory: SqliteDbFactory,
     asset_processor: ConcreteAssetProcessor,
 ) -> Result<(ServiceHandles, SubscriptionFactory), ExitCodes> {
-    // this code is duplicated from the base node
-    let comms_config = create_comms_config(config, node_identity.clone());
-
-    let (publisher, peer_message_subscriptions) = pubsub_connector(100, config.buffer_rate_limit_base_node);
+    let (publisher, peer_message_subscriptions) = pubsub_connector(100, p2p_config.inbound_rate_limit);
 
     let mut handles = StackBuilder::new(shutdown.clone())
-        .add_initializer(P2pInitializer::new(comms_config, publisher))
+        .add_initializer(P2pInitializer::new(p2p_config.clone(), publisher))
         .build()
         .await
         .map_err(|err| ExitCodes::ConfigError(err.to_string()))?;
@@ -124,122 +121,4 @@ fn setup_p2p_rpc(
         .add_service(create_validator_node_rpc_service(mempool, db_factory, asset_processor));
 
     comms.add_protocol_extension(rpc_server)
-}
-
-fn create_comms_config(config: &GlobalConfig, node_identity: Arc<NodeIdentity>) -> P2pConfig {
-    P2pConfig {
-        network: config.network,
-        node_identity,
-        transport_type: create_transport_type(config),
-        datastore_path: config.peer_db_path.clone(),
-        peer_database_name: "peers".to_string(),
-        max_concurrent_inbound_tasks: 100,
-        outbound_buffer_size: 100,
-        dht: DhtConfig {
-            database_url: DbConnectionUrl::File(config.data_dir.join("dht.db")),
-            auto_join: true,
-            allow_test_addresses: config.allow_test_addresses,
-            flood_ban_max_msg_count: config.flood_ban_max_msg_count,
-            saf_config: SafConfig {
-                msg_validity: config.saf_expiry_duration,
-                ..Default::default()
-            },
-            ..Default::default()
-        },
-        allow_test_addresses: config.allow_test_addresses,
-        listener_liveness_allowlist_cidrs: config.listener_liveness_allowlist_cidrs.clone(),
-        listener_liveness_max_sessions: config.listnener_liveness_max_sessions,
-        user_agent: format!("tari/dannode/{}", env!("CARGO_PKG_VERSION")),
-        // Also add sync peers to the peer seed list. Duplicates are acceptable.
-        peer_seeds: config
-            .peer_seeds
-            .iter()
-            .cloned()
-            .chain(config.force_sync_peers.clone())
-            .collect(),
-        dns_seeds: config.dns_seeds.clone(),
-        dns_seeds_name_server: config.dns_seeds_name_server.clone(),
-        dns_seeds_use_dnssec: config.dns_seeds_use_dnssec,
-        auxilary_tcp_listener_address: config.auxilary_tcp_listener_address.clone(),
-    }
-}
-
-/// Creates a transport type from the given configuration
-///
-/// ## Paramters
-/// `config` - The reference to the configuration in which to set up the comms stack, see [GlobalConfig]
-///
-/// ##Returns
-/// TransportType based on the configuration
-fn create_transport_type(config: &GlobalConfig) -> TransportType {
-    debug!(target: LOG_TARGET, "Transport is set to '{:?}'", config.comms_transport);
-    match config.comms_transport.clone() {
-        CommsTransport::Tcp {
-            listener_address,
-            tor_socks_address,
-            tor_socks_auth,
-        } => TransportType::Tcp {
-            listener_address,
-            tor_socks_config: tor_socks_address.map(|proxy_address| SocksConfig {
-                proxy_address,
-                authentication: tor_socks_auth.map(convert_socks_authentication).unwrap_or_default(),
-                proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
-            }),
-        },
-        CommsTransport::TorHiddenService {
-            control_server_address,
-            socks_address_override,
-            forward_address,
-            auth,
-            onion_port,
-            tor_proxy_bypass_addresses,
-            tor_proxy_bypass_for_outbound_tcp,
-        } => {
-            let identity = Some(&config.base_node_tor_identity_file)
-                .filter(|p| p.exists())
-                .and_then(|p| {
-                    // If this fails, we can just use another address
-                    load_from_json::<_, TorIdentity>(p).ok()
-                });
-            debug!(
-                target: LOG_TARGET,
-                "Tor identity at path '{}' {:?}",
-                config.base_node_tor_identity_file.to_string_lossy(),
-                identity
-                    .as_ref()
-                    .map(|ident| format!("loaded for address '{}.onion'", ident.service_id))
-                    .or_else(|| Some("not found".to_string()))
-                    .unwrap()
-            );
-
-            let forward_addr = multiaddr_to_socketaddr(&forward_address).expect("Invalid tor forward address");
-            TransportType::Tor(TorConfig {
-                control_server_addr: control_server_address,
-                control_server_auth: {
-                    match auth {
-                        TorControlAuthentication::None => tor::Authentication::None,
-                        TorControlAuthentication::Password(password) => tor::Authentication::HashedPassword(password),
-                    }
-                },
-                identity: identity.map(Box::new),
-                port_mapping: (onion_port, forward_addr).into(),
-                socks_address_override,
-                socks_auth: socks::Authentication::None,
-                tor_proxy_bypass_addresses,
-                tor_proxy_bypass_for_outbound_tcp,
-            })
-        },
-        CommsTransport::Socks5 {
-            proxy_address,
-            listener_address,
-            auth,
-        } => TransportType::Socks {
-            socks_config: SocksConfig {
-                proxy_address,
-                authentication: convert_socks_authentication(auth),
-                proxy_bypass_predicate: Arc::new(FalsePredicate::new()),
-            },
-            listener_address,
-        },
-    }
 }

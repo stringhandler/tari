@@ -38,18 +38,13 @@ use std::{
 use futures::FutureExt;
 use log::*;
 use tari_app_grpc::tari_rpc::validator_node_server::ValidatorNodeServer;
-use tari_app_utilities::{identity_management::setup_node_identity, initialization::init_configuration};
-use tari_common::{
-    configuration::{bootstrap::ApplicationType, ValidatorNodeConfig},
-    exit_codes::ExitCodes,
-    CommonConfig,
-    GlobalConfig,
-};
+use tari_app_utilities::identity_management::setup_node_identity;
+use tari_common::{exit_codes::ExitCodes, CommonConfig};
 use tari_comms::{connectivity::ConnectivityRequester, peer_manager::PeerFeatures, NodeIdentity};
 use tari_comms_dht::Dht;
 use tari_dan_core::services::{ConcreteAssetProcessor, ConcreteAssetProxy, MempoolServiceHandle, ServiceSpecification};
 use tari_dan_storage_sqlite::SqliteDbFactory;
-use tari_p2p::comms_connector::SubscriptionFactory;
+use tari_p2p::{comms_connector::SubscriptionFactory, initialization::P2pConfig};
 use tari_service_framework::ServiceHandles;
 use tari_shutdown::{Shutdown, ShutdownSignal};
 use tokio::{runtime, runtime::Runtime, task};
@@ -80,22 +75,22 @@ fn main() {
 fn main_inner() -> Result<(), ExitCodes> {
     let tari_config = TariConfig::load();
     let common_config = tari_config.get_section::<CommonConfig>();
-    let validator_config: ValidatorNodeConfig = ConfigLoader::load();
+    let validator_config = tari_config.get_section::<ValidatorNodeConfig>();
+    let p2p_config = tari_config.get_section::<P2pConfig>();
     let runtime = build_runtime()?;
-    runtime.block_on(run_node(config, bootstrap.create_id))?;
+    runtime.block_on(run_node(common_config, validator_config, p2p_config))?;
     Ok(())
 }
 
-async fn run_node(config: GlobalConfig, create_id: bool) -> Result<(), ExitCodes> {
+async fn run_node(
+    config: CommonConfig,
+    validator_config: ValidatorNodeConfig,
+    p2p_config: P2PConfig,
+) -> Result<(), ExitCodes> {
     let shutdown = Shutdown::new();
 
-    fs::create_dir_all(&config.peer_db_path).map_err(|err| ExitCodes::ConfigError(err.to_string()))?;
-    let node_identity = setup_node_identity(
-        &config.base_node_identity_file,
-        &config.public_address,
-        create_id,
-        PeerFeatures::NONE,
-    )?;
+    // fs::create_dir_all(&config.peer_db_path).map_err(|err| ExitCodes::ConfigError(err.to_string()))?;
+    let node_identity = setup_node_identity(&p2p_config, PeerFeatures::NONE)?;
     let db_factory = SqliteDbFactory::new(&config);
     let mempool_service = MempoolServiceHandle::default();
 

@@ -29,7 +29,8 @@ use std::{
 use log::*;
 use serde::{Deserialize, Serialize};
 use tari_common::configuration::serialize::seconds;
-use tari_common_types::types::Signature;
+use tari_common_types::types::{PrivateKey, Signature};
+use tari_utilities::{hex::Hex, Hashable};
 
 use crate::{blocks::Block, transactions::transaction::Transaction};
 

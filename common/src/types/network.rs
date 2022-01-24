@@ -82,7 +82,7 @@ impl FromStr for Network {
             "dibbler" => Ok(Dibbler),
             invalid => Err(ConfigurationError::new(
                 "network",
-                Some(value.to_string()),
+                Some(invalid.to_string()),
                 &format!("Invalid network option: {}", invalid),
             )),
         }

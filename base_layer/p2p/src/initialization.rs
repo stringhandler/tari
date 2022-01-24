@@ -156,6 +156,8 @@ pub struct P2pConfig {
     /// for direct comms between a wallet and base node. If this is set to None, no listener will be bound.
     /// Default: None
     pub auxilary_tcp_listener_address: Option<Multiaddr>,
+    /// The maximum inbound messages per second
+    pub inbound_rate_limit: usize,
 }
 
 /// Initialize Tari Comms configured for tests

@@ -994,7 +994,7 @@ where
 //                         .map_err(|err| ConfigurationError::new(&key, None, &err.to_string()))
 //                         .and_then(|s| {
 //                             Multiaddr::from_str(&s)
-                                .map_err(|err| ConfigurationError::new(&key, Some(s), &err.to_string()))
+//                                 .map_err(|err| ConfigurationError::new(&key, Some(s), &err.to_string()))
 //                         })
 //                 })
 //                 .collect::<Result<_, _>>()?;
@@ -1042,7 +1042,7 @@ where
 //         },
 //         t => Err(ConfigurationError::new(
 //             &transport_key,
-            Some(t.to_string()),
+//             Some(t.to_string()),
 //             &format!("Invalid transport type '{}'", t),
 //         )),
 //     }

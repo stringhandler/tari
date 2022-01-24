@@ -24,8 +24,9 @@ use std::{io, sync::Arc};
 
 use futures::future::Either;
 use log::*;
-use tari_common::types::SocksAuthentication;
-// use tari_common::{exit_codes::ExitCodes, CommsTransport, GlobalConfig, SocksAuthentication, TorControlAuthentication};
+use tari_common::{exit_codes::ExitCodes, types::SocksAuthentication};
+// use tari_common::{exit_codes::ExitCodes, CommsTransport, GlobalConfig, SocksAuthentication,
+// TorControlAuthentication};
 use tari_common_types::{emoji::EmojiId, types::BlockHash};
 use tari_comms::{
     multiaddr::{Multiaddr, Protocol},

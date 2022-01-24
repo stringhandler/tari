@@ -271,7 +271,7 @@ dependencies = [
  "serde 1.0.133",
  "serde_json",
  "serde_urlencoded 0.6.1",
- "url 2.2.2",
+ "url",
  "wildmatch",
 ]
 
@@ -564,7 +564,7 @@ dependencies = [
  "thiserror",
  "tokio 1.15.0",
  "tokio-util",
- "url 2.2.2",
+ "url",
  "winapi 0.3.9",
 ]
 
@@ -1535,21 +1535,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
 
 [[package]]
-name = "curl-sys"
-version = "0.4.52+curl-7.81.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b8c2d1023ea5fded5b7b892e4b8e95f70038a421126a056761a84246a28971"
-dependencies = [
- "cc",
- "libc",
- "libz-sys",
- "openssl-sys",
- "pkg-config",
- "vcpkg",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "curve25519-dalek"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1904,7 +1889,7 @@ dependencies = [
  "ed25519",
  "rand 0.7.3",
  "serde 1.0.133",
- "sha2",
+ "sha2 0.9.9",
  "zeroize",
 ]
 
@@ -2141,7 +2126,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fc25a87fa4fd2094bffb06925852034d90a17f0d1e05197d4956d3555752191"
 dependencies = [
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -2547,9 +2532,9 @@ dependencies = [
 
 [[package]]
 name = "git2"
-version = "0.8.0"
+version = "0.13.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7339329bfa14a00223244311560d11f8f489b453fb90092af97f267a6090ab0"
+checksum = "f29229cc1b24c0e6062f6e742aa3e256492a5323365e5ed3413599f8a5eff7d6"
 dependencies = [
  "bitflags 1.3.2",
  "libc",
@@ -2557,7 +2542,7 @@ dependencies = [
  "log",
  "openssl-probe",
  "openssl-sys",
- "url 1.7.2",
+ "url",
 ]
 
 [[package]]
@@ -2960,17 +2945,6 @@ checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
 
 [[package]]
 name = "idna"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
-dependencies = [
- "matches",
- "unicode-bidi",
- "unicode-normalization",
-]
-
-[[package]]
-name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "418a0a6fab821475f634efe3ccc45c013f742efe03d853e8d3355d5cb850ecf8"
@@ -3242,12 +3216,11 @@ checksum = "1b03d17f364a3a042d5e5d46b053bbbf82c92c9430c592dd4c064dc6ee997125"
 
 [[package]]
 name = "libgit2-sys"
-version = "0.7.11"
+version = "0.12.26+1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48441cb35dc255da8ae72825689a95368bf510659ae1ad55dc4aa88cb1789bf1"
+checksum = "19e1c899248e606fbfe68dcb31d8b0176ebab833b103824af31bddf4b7457494"
 dependencies = [
  "cc",
- "curl-sys",
  "libc",
  "libssh2-sys",
  "libz-sys",
@@ -3740,11 +3713,11 @@ dependencies = [
  "byteorder",
  "data-encoding",
  "multihash",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "serde 1.0.133",
  "static_assertions",
  "unsigned-varint",
- "url 2.2.2",
+ "url",
 ]
 
 [[package]]
@@ -4209,7 +4182,7 @@ dependencies = [
  "futures 0.3.19",
  "js-sys",
  "lazy_static 1.4.0",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project 1.0.10",
  "rand 0.8.4",
  "thiserror",
@@ -4447,12 +4420,6 @@ dependencies = [
 
 [[package]]
 name = "percent-encoding"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
-
-[[package]]
-name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
@@ -4559,7 +4526,7 @@ dependencies = [
  "ripemd160",
  "rsa",
  "sha-1 0.9.8",
- "sha2",
+ "sha2 0.9.9",
  "sha3",
  "signature",
  "smallvec",
@@ -5280,14 +5247,14 @@ dependencies = [
  "log",
  "mime",
  "native-tls",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite 0.2.8",
  "serde 1.0.133",
  "serde_json",
  "serde_urlencoded 0.7.0",
  "tokio 1.15.0",
  "tokio-native-tls",
- "url 2.2.2",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -5389,7 +5356,7 @@ dependencies = [
  "num-traits 0.2.14",
  "pem",
  "rand 0.7.3",
- "sha2",
+ "sha2 0.9.9",
  "simple_asn1",
  "subtle",
  "thiserror",
@@ -5747,7 +5714,7 @@ dependencies = [
  "dtoa",
  "itoa 0.4.8",
  "serde 1.0.133",
- "url 2.2.2",
+ "url",
 ]
 
 [[package]]
@@ -5849,6 +5816,17 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99c3bd8169c58782adad9290a9af5939994036b76187f7b4f0e6de91dbbfc0ec"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cpufeatures",
+ "digest 0.10.1",
 ]
 
 [[package]]
@@ -5976,7 +5954,7 @@ dependencies = [
  "rand 0.8.4",
  "rand_core 0.6.3",
  "rustc_version 0.3.3",
- "sha2",
+ "sha2 0.9.9",
  "subtle",
  "x25519-dalek",
 ]
@@ -6336,11 +6314,13 @@ dependencies = [
  "config 0.9.3",
  "dirs-next 1.0.2",
  "futures 0.3.19",
+ "get_if_addrs",
  "json5",
  "log",
  "rand 0.8.4",
  "serde 1.0.133",
  "structopt",
+ "tari_build",
  "tari_common",
  "tari_common_types",
  "tari_comms",
@@ -6397,6 +6377,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tari_build"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "git2",
+ "prost-build",
+ "serde 1.0.133",
+ "sha2 0.10.1",
+ "toml 0.5.8",
+]
+
+[[package]]
 name = "tari_bulletproofs"
 version = "4.1.0"
 source = "git+https://github.com/tari-project/bulletproofs?branch=main#40bb86219bb22b9a31a3938d6547036505f49e66"
@@ -6448,25 +6440,20 @@ name = "tari_common"
 version = "0.25.0"
 dependencies = [
  "anyhow",
- "config 0.9.3",
+ "config 0.11.0",
  "dirs-next 1.0.2",
  "fs2 0.4.3",
- "get_if_addrs",
- "git2",
  "log",
  "log4rs 1.0.0",
  "multiaddr",
  "path-clean",
- "prost-build",
  "serde 1.0.133",
  "serde_json",
- "sha2",
  "structopt",
  "tari_storage",
  "tari_test_utils 0.25.0",
  "tempfile",
  "thiserror",
- "toml 0.5.8",
 ]
 
 [[package]]
@@ -6523,7 +6510,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "snow",
- "tari_common",
+ "tari_build",
  "tari_comms_rpc_macros",
  "tari_crypto",
  "tari_metrics",
@@ -6569,7 +6556,7 @@ dependencies = [
  "rand 0.8.4",
  "serde 1.0.133",
  "serde_derive",
- "tari_common",
+ "tari_build",
  "tari_common_sqlite",
  "tari_comms",
  "tari_comms_rpc_macros",
@@ -6617,7 +6604,7 @@ dependencies = [
  "regex",
  "rpassword",
  "rustyline",
- "sha2",
+ "sha2 0.9.9",
  "strum 0.22.0",
  "strum_macros 0.22.0",
  "tari_app_grpc",
@@ -6680,6 +6667,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "strum_macros 0.22.0",
+ "tari_build",
  "tari_common",
  "tari_common_types",
  "tari_comms",
@@ -6718,7 +6706,7 @@ dependencies = [
  "rmp-serde",
  "serde 1.0.133",
  "serde_json",
- "sha2",
+ "sha2 0.9.9",
  "sha3",
  "tari_bulletproofs",
  "tari_utilities",
@@ -6731,7 +6719,7 @@ version = "0.1.0"
 dependencies = [
  "prost",
  "prost-types",
- "tari_common",
+ "tari_build",
 ]
 
 [[package]]
@@ -6809,7 +6797,7 @@ dependencies = [
  "serde 1.0.133",
  "serde_derive",
  "serde_json",
- "sha2",
+ "sha2 0.9.9",
  "strum 0.22.0",
  "strum_macros 0.22.0",
  "tari_common_types",
@@ -6889,7 +6877,7 @@ dependencies = [
  "tokio 1.15.0",
  "tonic",
  "tracing",
- "url 2.2.2",
+ "url",
 ]
 
 [[package]]
@@ -6970,6 +6958,7 @@ dependencies = [
  "semver 1.0.4",
  "serde 1.0.133",
  "serde_derive",
+ "tari_build",
  "tari_common",
  "tari_comms",
  "tari_comms_dht",
@@ -7023,7 +7012,6 @@ dependencies = [
  "log",
  "rand 0.8.4",
  "serde 1.0.133",
- "serde_derive",
  "tari_utilities",
  "thiserror",
 ]
@@ -7074,7 +7062,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tracing",
- "url 2.2.2",
+ "url",
 ]
 
 [[package]]
@@ -7141,6 +7129,7 @@ dependencies = [
  "serde_json",
  "tari_app_grpc",
  "tari_app_utilities",
+ "tari_build",
  "tari_common",
  "tari_common_types",
  "tari_comms",
@@ -7188,7 +7177,7 @@ dependencies = [
  "rand 0.8.4",
  "serde 1.0.133",
  "serde_json",
- "sha2",
+ "sha2 0.9.9",
  "strum 0.22.0",
  "strum_macros 0.22.0",
  "tari_common",
@@ -7267,7 +7256,7 @@ dependencies = [
  "open",
  "os_info",
  "os_pipe",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "rand 0.8.4",
  "raw-window-handle 0.3.4",
  "rfd",
@@ -7285,7 +7274,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio 1.15.0",
- "url 2.2.2",
+ "url",
  "uuid",
  "zip",
 ]
@@ -7384,7 +7373,7 @@ dependencies = [
  "serde 1.0.133",
  "serde_json",
  "thiserror",
- "url 2.2.2",
+ "url",
  "zstd",
 ]
 
@@ -7702,7 +7691,7 @@ dependencies = [
  "http-body",
  "hyper",
  "hyper-timeout",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project 1.0.10",
  "prost",
  "prost-derive",
@@ -7963,7 +7952,7 @@ dependencies = [
  "futures-channel",
  "futures-io",
  "futures-util",
- "idna 0.2.3",
+ "idna",
  "ipnet",
  "lazy_static 1.4.0",
  "log",
@@ -7975,7 +7964,7 @@ dependencies = [
  "tinyvec",
  "tokio 1.15.0",
  "tokio-rustls",
- "url 2.2.2",
+ "url",
  "webpki",
 ]
 
@@ -8126,25 +8115,14 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "url"
-version = "1.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4e7c0d531266369519a4aa4f399d748bd37043b00bde1e4ff1f60a120b355a"
-dependencies = [
- "idna 0.1.5",
- "matches",
- "percent-encoding 1.0.1",
-]
-
-[[package]]
-name = "url"
 version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507c383b2d33b5fc35d1861e77e6b383d158b2da5e14fe51b83dfedf6fd578c"
 dependencies = [
  "form_urlencoded",
- "idna 0.2.3",
+ "idna",
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "serde 1.0.133",
 ]
 
@@ -8254,7 +8232,7 @@ dependencies = [
  "log",
  "mime",
  "mime_guess",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project 1.0.10",
  "scoped-tls",
  "serde 1.0.133",
@@ -8674,7 +8652,7 @@ dependencies = [
  "serde_json",
  "tao",
  "thiserror",
- "url 2.2.2",
+ "url",
  "webkit2gtk",
  "webkit2gtk-sys",
  "webview2",
