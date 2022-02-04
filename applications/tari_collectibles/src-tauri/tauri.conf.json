@@ -60,6 +60,13 @@
         "fullscreen": false
       }
     ],
+    "cli": {
+      "subcommands": {
+        "create-asset": {
+
+        }
+      }
+    },
     "security": {
       "csp": "default-src blob: data: filesystem: ws: wss: http: https: tauri: 'unsafe-eval' 'unsafe-inline' 'self' img-src: 'self'"
     }

@@ -20,10 +20,16 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{storage::state::StateDbUnitOfWork, DigitalAssetError};
-use tari_crypto::common::Blake256;
-use tari_common_types::types::PublicKey;
+use std::io::{Error, Read, Write};
+
 use digest::Digest;
+use serde::{Deserialize, Serialize};
+use tari_common_types::types::PublicKey;
+use tari_core::consensus::{ConsensusDecoding, ConsensusEncoding, ConsensusEncodingSized, ToConsensusBytes};
+use tari_crypto::common::Blake256;
+use tari_dan_common_types::proto::tips::tip10001;
+
+use crate::{storage::state::StateDbUnitOfWork, DigitalAssetError};
 
 const LOG_TARGET: &str = "tari::dan_layer::core::templates::tip10001_template";
 
@@ -60,76 +66,100 @@ pub fn invoke_read_method<TUnitOfWork: StateDbUnitOfWork>(
                     message_type: "tip10001::ListLimitsRequest".to_string(),
                 })?;
             let (limits, total) = list_limits(request, state_db)?;
-            let response = tip10001::ListLimitsResponse {
-                limits,
-                total
-            };
+            let response = tip10001::ListLimitsResponse { limits, total };
             Ok(Some(response.encode_to_vec()))
         },
         _ => todo!(),
     }
 }
 
-fn list_limits<TUnitOfWork: StateDbUnitOfWork>(request: tip10001::ListLimitsRequest, state_db: &mut TUnitOfWork) ->Result<(Vec<Limit>, u32), DigitalAssetError> {
+fn list_limits<TUnitOfWork: StateDbUnitOfWork>(
+    request: tip10001::ListLimitsRequest,
+    state_db: &mut TUnitOfWork,
+) -> Result<(Vec<Limit>, u32), DigitalAssetError> {
     let mut results = vec![];
     let mut total = 0;
     if request.asset_public_key.is_empty() {
-       total = state_db.count("limits")?;
-        for (hash, limit) in state_db.list_values("limits", request.page * request.page_size, request.page_size) {
-           results.push(tip10001::Limit {
-               maker_asset_public_key: limit.maker_asset_public_key,
-               maker_amount: limit.maker_amount,
-               maker_nft_id: limit.maker_nft_id,
-               taker_amount_in_native: limit.taker_amount_in_native,
-               ownership_proof: limit.ownership_proof,
-               hash
-           });
+        total = state_db.count("limits")?;
+        for (hash, limit_bytes) in state_db.list_values("limits", request.page * request.page_size, request.page_size) {
+            let limit: Limit = limit_bytes.from_consensus_bytes();
+            results.push(tip10001::Limit {
+                maker_asset_public_key: limit.maker_asset_public_key,
+                maker_amount: limit.maker_amount,
+                maker_nft_id: limit.maker_nft_id,
+                taker_amount_in_native: limit.taker_amount_in_native,
+                ownership_proof: limit.ownership_proof,
+                hash,
+            });
         }
-    }
-    else {
+    } else {
         todo!();
     }
 
-   Ok((results, total))
+    Ok((results, total))
 }
 
-fn create_limit<TUnitOfWork: StateDbUnitOfWork>(limit_request: tip10001::CreateLimitRequest, state_db: &mut TUnitOfWork) -> Result<(), DigitalAssetError> {
+fn create_limit<TUnitOfWork: StateDbUnitOfWork>(
+    limit_request: tip10001::CreateLimitRequest,
+    state_db: &mut TUnitOfWork,
+) -> Result<(), DigitalAssetError> {
     // TODO: check proof of ownership
     let limit: Limit = limit_request.limit.unwrap().into();
     let hash = limit.hash();
-    state_db.set_value("limits".to_string(), hash.clone(), bincode::serialize(limit))?;
-    state_db.set_value(format!("limits::{}", limit.maker_asset_public_key), hash.clone(), vec![])?;
+    state_db.set_value("limits".to_string(), hash.clone(), limit.to_consensus_bytes())?;
+    state_db.set_value(
+        format!("limits::{}", limit.maker_asset_public_key),
+        hash.clone(),
+        vec![],
+    )?;
     state_db.set_value("owners".to_string(), hash, limit_request.owner)?;
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
 pub struct Limit {
+    version: u8,
     maker_asset_public_key: PublicKey,
     maker_amount: u64,
     maker_nft_ids: Vec<Vec<u8>>,
     taker_amount_in_native: u64,
-    ownership_proof: Vec<u8>
+    ownership_proof: Vec<u8>,
+}
+
+impl ConsensusEncoding for Limit {
+    fn consensus_encode<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {}
+}
+impl ConsensusDecoding for Limit {
+    fn consensus_decode<R: Read>(reader: &mut R) -> Result<Self, Error> {
+        let mut buf = [0u8; 1];
+        reader.read_exact(&mut buf)?;
+        let limit = buf[0]
+            .try_into()
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, format!("Unknown version {}", buf[0])))?;
+        Ok(limit)
+    }
 }
 
 impl Limit {
     fn hash(&self) -> Vec<u8> {
-        Blake256::new().chain(&self.maker_asset_public_key).chain(self.maker_amount).chain(&self.maker_nft_ids).chain(&self.taker_amount_in_native).chain(&self.ownership_proof).finalize().to_vec()
+        Blake256::new()
+            .chain(&self.maker_asset_public_key)
+            .chain(self.maker_amount)
+            .chain(&self.maker_nft_ids)
+            .chain(&self.taker_amount_in_native)
+            .chain(&self.ownership_proof)
+            .finalize()
+            .to_vec()
     }
 }
-
-
 
 impl From<tip10001::CreateLimitRequest> for Limit {
     fn from(source: tip10001::CreateLimitRequest) -> Self {
         Self {
-                maker_asset_public_key: source.maker_asset_public_key,
+            maker_asset_public_key: source.maker_asset_public_key,
             maker_amount: source.maker_amount,
             maker_nft_ids: source.maker_nft_ids,
             taker_amount_in_native: source.taker_amount_in_native,
-            ownership_proof: source.ownership_proof
-            }
-
+            ownership_proof: source.ownership_proof,
         }
     }
 }

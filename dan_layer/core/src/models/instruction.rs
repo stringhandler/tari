@@ -28,7 +28,7 @@ use crate::models::TemplateId;
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
-    asset_id: PublicKey,
+    // asset_id: PublicKey,
     template_id: TemplateId,
     method: String,
     args: Vec<u8>,
