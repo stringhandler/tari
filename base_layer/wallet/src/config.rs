@@ -44,6 +44,7 @@ pub struct WalletConfig {
     pub network: Network,
     pub base_node_service_config: BaseNodeServiceConfig,
     pub updater_config: AutoUpdateConfig,
+    pub contacts_auto_ping_interval: Duration,
 }
 
 impl Default for WalletConfig {

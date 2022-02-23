@@ -49,7 +49,7 @@ pub fn init_configuration(
                 // if let DatabaseType::LMDB(_) = global_config.db_type {
                 //     global_config.db_type = DatabaseType::LMDB(global_config.data_dir.join("db"));
                 // }
-                // global_config.peer_db_path = global_config.data_dir.join("peer_db");
+                // global_config.comms_peer_db_path = global_config.data_dir.join("peer_db");
                 global_config.wallet_peer_db_path = global_config.data_dir.join("wallet_peer_db");
                 global_config.console_wallet_peer_db_path = global_config.data_dir.join("console_wallet_peer_db");
             },
