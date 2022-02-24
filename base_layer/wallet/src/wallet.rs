@@ -61,6 +61,7 @@ use tari_p2p::{
     comms_connector::pubsub_connector,
     initialization,
     initialization::P2pInitializer,
+    services::liveness::{LivenessConfig, LivenessInitializer},
     transport::TransportType,
 };
 use tari_service_framework::StackBuilder;

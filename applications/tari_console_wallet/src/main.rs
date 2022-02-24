@@ -96,7 +96,7 @@ fn main_inner() -> Result<(), ExitError> {
         .expect("Failed to build a runtime!");
 
     #[allow(unused_mut)] // config isn't mutated on windows
-    let (bootstrap, mut global_config, _) = init_configuration(ApplicationType::ConsoleWallet)?;
+    let (bootstrap, mut global_config, cfg) = init_configuration(ApplicationType::ConsoleWallet)?;
 
     if bootstrap.tracing_enabled {
         enable_tracing();

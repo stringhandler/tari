@@ -376,9 +376,9 @@ pub async fn init_wallet(
 
     let comms_config = P2pConfig {
         network: config.network,
-        node_identity,
+        // node_identity,
         user_agent: format!("tari/wallet/{}", env!("CARGO_PKG_VERSION")),
-        transport_type,
+        // transport_type,
         auxilary_tcp_listener_address: None,
         datastore_path: config.console_wallet_peer_db_path.clone(),
         peer_database_name: "peers".to_string(),
@@ -416,10 +416,9 @@ pub async fn init_wallet(
     let updater_config = <AutoUpdateConfig as DefaultConfigLoader>::load_from(&config.inner)?;
 
     let factories = CryptoFactories::default();
-    let wallet_config = WalletConfig::new(
-        comms_config.clone(),
-        factories,
-        Some(TransactionServiceConfig {
+    let wallet_config = WalletConfig {
+        comms_config: comms_config.clone(),
+        transaction_service_config: TransactionServiceConfig {
             broadcast_monitoring_timeout: config.transaction_broadcast_monitoring_timeout,
             chain_monitoring_timeout: config.transaction_chain_monitoring_timeout,
             direct_send_timeout: config.transaction_direct_send_timeout,
@@ -430,95 +429,93 @@ pub async fn init_wallet(
             num_confirmations_required: config.transaction_num_confirmations_required,
             transaction_event_channel_size: config.transaction_event_channel_size,
             ..Default::default()
-        }),
-        Some(OutputManagerServiceConfig {
+        },
+        output_manager_service_config: OutputManagerServiceConfig {
             base_node_query_timeout: config.base_node_query_timeout,
             prevent_fee_gt_amount: config.prevent_fee_gt_amount,
             event_channel_size: config.output_manager_event_channel_size,
             num_confirmations_required: config.transaction_num_confirmations_required,
             ..Default::default()
-        }),
-        config.network.into(),
-        Some(base_node_service_config),
-        Some(std::cmp::max(
-            BASE_NODE_BUFFER_MIN_SIZE,
-            config.buffer_size_console_wallet,
-        )),
-        Some(config.buffer_rate_limit_console_wallet),
-        Some(updater_config),
-    );
-
-    let mut wallet = Wallet::start(
-        wallet_config,
-        wallet_db,
-        transaction_backend,
-        output_manager_backend,
-        contacts_backend,
-        shutdown_signal,
-        master_seed,
-    )
-    .await
-    .map_err(|e| {
-        if let WalletError::CommsInitializationError(e) = e {
-            ExitError::new(ExitCode::WalletError, e.to_friendly_string())
-        } else {
-            ExitError::new(ExitCode::WalletError, format!("Error creating Wallet Container: {}", e))
-        }
-    })?;
-    if let Some(hs) = wallet.comms.hidden_service() {
-        wallet
-            .db
-            .set_tor_identity(hs.tor_identity().clone())
-            .await
-            .map_err(|e| ExitError::new(ExitCode::WalletError, format!("Problem writing tor identity. {}", e)))?;
-    }
-
-    if !wallet_encrypted {
-        debug!(target: LOG_TARGET, "Wallet is not encrypted.");
-
-        // create using --password arg if supplied and skip seed words confirmation
-        let (passphrase, interactive) = if let Some(password) = arg_password {
-            debug!(target: LOG_TARGET, "Setting password from command line argument.");
-
-            (password, false)
-        } else {
-            debug!(target: LOG_TARGET, "Prompting for password.");
-            let password = prompt_password("Create wallet password: ")?;
-            let confirmed = prompt_password("Confirm wallet password: ")?;
-
-            if password != confirmed {
-                return Err(ExitError::new(ExitCode::InputError, "Passwords don't match!"));
-            }
-
-            (password, true)
-        };
-
-        wallet.apply_encryption(passphrase).await?;
-
-        debug!(target: LOG_TARGET, "Wallet encrypted.");
-
-        if interactive && recovery_seed.is_none() {
-            match confirm_seed_words(&mut wallet).await {
-                Ok(()) => {
-                    print!("\x1Bc"); // Clear the screen
-                },
-                Err(error) => {
-                    return Err(error);
-                },
-            };
-        }
-    }
-    if let Some(file_name) = seed_words_file_name {
-        let seed_words = wallet.output_manager_service.get_seed_words().await?.join(" ");
-        let _ = fs::write(file_name, seed_words).map_err(|e| {
-            ExitError::new(
-                ExitCode::WalletError,
-                format!("Problem writing seed words to file: {}", e),
-            )
-        });
+        },
+        network: config.network,
+        base_node_service_config,
+        buffer_size: config.buffer_size_console_wallet,
+        rate_limit: config.buffer_rate_limit_console_wallet,
+        updater_config,
     };
 
-    Ok(wallet)
+    todo!("Read config from file properly")
+    // let mut wallet = Wallet::start(
+    //     wallet_config,
+    //     wallet_db,
+    //     transaction_backend,
+    //     output_manager_backend,
+    //     contacts_backend,
+    //     shutdown_signal,
+    //     master_seed,
+    // )
+    // .await
+    // .map_err(|e| {
+    //     if let WalletError::CommsInitializationError(e) = e {
+    //         ExitError::new(ExitCode::WalletError, e.to_friendly_string())
+    //     } else {
+    //         ExitError::new(ExitCode::WalletError, format!("Error creating Wallet Container: {}", e))
+    //     }
+    // })?;
+    // if let Some(hs) = wallet.comms.hidden_service() {
+    //     wallet
+    //         .db
+    //         .set_tor_identity(hs.tor_identity().clone())
+    //         .await
+    //         .map_err(|e| ExitError::new(ExitCode::WalletError, format!("Problem writing tor identity. {}", e)))?;
+    // }
+    //
+    // if !wallet_encrypted {
+    //     debug!(target: LOG_TARGET, "Wallet is not encrypted.");
+    //
+    //     // create using --password arg if supplied and skip seed words confirmation
+    //     let (passphrase, interactive) = if let Some(password) = arg_password {
+    //         debug!(target: LOG_TARGET, "Setting password from command line argument.");
+    //
+    //         (password, false)
+    //     } else {
+    //         debug!(target: LOG_TARGET, "Prompting for password.");
+    //         let password = prompt_password("Create wallet password: ")?;
+    //         let confirmed = prompt_password("Confirm wallet password: ")?;
+    //
+    //         if password != confirmed {
+    //             return Err(ExitError::new(ExitCode::InputError, "Passwords don't match!"));
+    //         }
+    //
+    //         (password, true)
+    //     };
+    //
+    //     wallet.apply_encryption(passphrase).await?;
+    //
+    //     debug!(target: LOG_TARGET, "Wallet encrypted.");
+    //
+    //     if interactive && recovery_seed.is_none() {
+    //         match confirm_seed_words(&mut wallet).await {
+    //             Ok(()) => {
+    //                 print!("\x1Bc"); // Clear the screen
+    //             },
+    //             Err(error) => {
+    //                 return Err(error);
+    //             },
+    //         };
+    //     }
+    // }
+    // if let Some(file_name) = seed_words_file_name {
+    //     let seed_words = wallet.output_manager_service.get_seed_words().await?.join(" ");
+    //     let _ = fs::write(file_name, seed_words).map_err(|e| {
+    //         ExitError::new(
+    //             ExitCode::WalletError,
+    //             format!("Problem writing seed words to file: {}", e),
+    //         )
+    //     });
+    // };
+    //
+    // Ok(wallet)
 }
 
 /// Starts the wallet by setting the base node peer, and restarting the transaction and broadcast protocols.

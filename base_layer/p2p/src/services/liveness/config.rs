@@ -22,10 +22,11 @@
 
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use tari_comms::peer_manager::NodeId;
 
 /// Configuration for liveness service
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LivenessConfig {
     /// The interval to send Ping messages, or None to disable periodic pinging (default: None (disabled))
     pub auto_ping_interval: Option<Duration>,

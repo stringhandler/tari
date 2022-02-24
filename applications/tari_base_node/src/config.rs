@@ -33,7 +33,7 @@ use tari_common::{
 };
 use tari_comms::multiaddr::Multiaddr;
 use tari_core::{chain_storage::BlockchainDatabaseConfig, mempool::MempoolConfig};
-use tari_p2p::initialization::P2pConfig;
+use tari_p2p::{initialization::P2pConfig, services::liveness::LivenessConfig};
 use tari_storage::lmdb_store::LMDBConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +67,9 @@ pub struct BaseNodeConfig {
     pub p2p: P2pConfig,
     // TODO: move to p2p config or rpc config
     pub rpc_max_simultaneous_sessions: usize,
+    pub status_line_interval: Duration,
+    pub metadata_auto_ping_interval: Duration,
+    pub liveness: LivenessConfig,
 }
 
 impl Default for BaseNodeConfig {
