@@ -132,15 +132,19 @@ impl<TBackendAdapter: StateDbBackendAdapter + 'static> StateDbUnitOfWork for Sta
         //     .backend_adapter
         //     .get_current_state_tree(&tx)
         //     .map_err(TBackendAdapter::Error::into)?;
-        debug!(target: LOG_TARGET, "Committing {} state update(s)", inner.updates.len());
-        for item in &inner.updates {
+        debug!(
+            target: LOG_TARGET,
+            "Committing {} state update(s)",
+            self.inner.updates.len()
+        );
+        for item in &self.inner.updates {
             let i = item.get();
-            inner
+            self.inner
                 .backend_adapter
                 .update_key_value(&i.schema, &i.key, &i.value, &tx)
                 .map_err(TBackendAdapter::Error::into)?;
 
-            inner
+            self.inner
                 .backend_adapter
                 .add_state_oplog_entry(
                     DbStateOpLogEntry::set_operation(self.context.height, i.deref().clone()),
@@ -156,11 +160,11 @@ impl<TBackendAdapter: StateDbBackendAdapter + 'static> StateDbUnitOfWork for Sta
         //     .set_current_state_tree(current_tree, &tx)
         //     .map_err(TBackendAdapter::Error::into)?;
 
-        inner
+        self.inner
             .backend_adapter
             .commit(&tx)
             .map_err(TBackendAdapter::Error::into)?;
-        inner.updates = vec![];
+        self.inner.updates = vec![];
 
         Ok(())
     }
@@ -168,12 +172,12 @@ impl<TBackendAdapter: StateDbBackendAdapter + 'static> StateDbUnitOfWork for Sta
     /// Clears the state db immediately (before commit) - this will not be needed in future when build up the state from
     /// instructions/op logs
     fn clear_all_state(&self) -> Result<(), StorageError> {
-        let inner = self.inner;
-        let tx = inner
+        let tx = self
+            .inner
             .backend_adapter
             .create_transaction()
             .map_err(TBackendAdapter::Error::into)?;
-        inner
+        self.inner
             .backend_adapter
             .clear_all_state(&tx)
             .map_err(TBackendAdapter::Error::into)
@@ -186,9 +190,8 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_value(&self, schema: &str, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        let inner = self.inner;
         // Hit the DB.
-        inner
+        self.inner
             .backend_adapter
             .get(schema, key)
             .map_err(TBackendAdapter::Error::into)
@@ -207,16 +210,15 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn find_keys_by_value(&self, schema: &str, value: &[u8]) -> Result<Vec<Vec<u8>>, StorageError> {
-        let inner = self.inner;
-        inner
+        self.inner
             .backend_adapter
             .find_keys_by_value(schema, value)
             .map_err(TBackendAdapter::Error::into)
     }
 
     fn calculate_root(&self) -> Result<StateRoot, StorageError> {
-        let inner = self.inner;
-        let tx = inner
+        let tx = self
+            .inner
             .backend_adapter
             .create_transaction()
             .map_err(TBackendAdapter::Error::into)?;
@@ -224,7 +226,8 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
 
         // omg it's an MMR of MMRs
         let mut top_level_mmr = MerkleMountainRange::<Blake256, _>::new(MemBackendVec::new());
-        let schemas = inner
+        let schemas = self
+            .inner
             .backend_adapter
             .get_all_schemas(&tx)
             .map_err(TBackendAdapter::Error::into)?;
@@ -236,7 +239,8 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
 
         for schema in schemas {
             let mut mmr = MerkleMountainRange::<Blake256, _>::new(MemBackendVec::new());
-            for key_value in inner
+            for key_value in self
+                .inner
                 .backend_adapter
                 .get_all_values_for_schema(&schema, &tx)
                 .map_err(TBackendAdapter::Error::into)?
@@ -248,7 +252,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
                     key_value.key.to_hex(),
                     key_value.value.to_hex()
                 );
-                if let Some(updated_value) = find_update(&inner, &schema, &key_value.key) {
+                if let Some(updated_value) = find_update(&self.inner, &schema, &key_value.key) {
                     let hasher = HashDigest::new();
                     mmr.push(hasher.chain(&key_value.key).chain(updated_value).finalize().to_vec())?;
                 } else {
@@ -268,19 +272,21 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_all_state(&self) -> Result<Vec<SchemaState>, StorageError> {
-        let inner = self.inner;
-        let tx = inner
+        let tx = self
+            .inner
             .backend_adapter
             .create_transaction()
             .map_err(TBackendAdapter::Error::into)?;
 
-        let schemas = inner
+        let schemas = self
+            .inner
             .backend_adapter
             .get_all_schemas(&tx)
             .map_err(TBackendAdapter::Error::into)?;
         let mut schema_state = Vec::with_capacity(schemas.len());
         for schema in schemas {
-            let key_values = inner
+            let key_values = self
+                .inner
                 .backend_adapter
                 .get_all_values_for_schema(&schema, &tx)
                 .map_err(TBackendAdapter::Error::into)?;
@@ -288,7 +294,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
             let key_values = key_values
                 .into_iter()
                 .map(|kv| {
-                    let value = find_update(&inner, &schema, &kv.key).unwrap_or(kv.value);
+                    let value = find_update(&self.inner, &schema, &kv.key).unwrap_or(kv.value);
                     KeyValue { key: kv.key, value }
                 })
                 .collect();
@@ -299,13 +305,14 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_op_logs_for_height(&self, height: u64) -> Result<Vec<StateOpLogEntry>, StorageError> {
-        let inner = self.inner;
-        let tx = inner
+        let tx = self
+            .inner
             .backend_adapter
             .create_transaction()
             .map_err(TBackendAdapter::Error::into)?;
 
-        let op_logs = inner
+        let op_logs = self
+            .inner
             .backend_adapter
             .get_state_op_logs_by_height(height, &tx)
             .map_err(TBackendAdapter::Error::into)?;

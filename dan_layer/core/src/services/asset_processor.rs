@@ -90,7 +90,7 @@ mod nodes {
 
     use d3ne::node::{IOData, InputData, Node, OutputData};
     use tari_common_types::types::PublicKey;
-    use tari_utilities::hex::Hex;
+    use tari_utilities::{hex::Hex, ByteArray};
 
     use crate::{
         services::asset_processor::{ArgValue, Bucket, Worker},
@@ -116,7 +116,7 @@ mod nodes {
             dbg!("create_bucket");
             let mut map = HashMap::new();
             let amount = match node.get_number_field("amount", &inputs) {
-                Ok(a) => a,
+                Ok(a) => a as u64,
                 Err(err) => {
                     let mut err_map = HashMap::new();
                     err_map.insert("error".to_string(), Err(err));
@@ -124,7 +124,7 @@ mod nodes {
                 },
             };
             let token_id = match node.get_number_field("token_id", &inputs) {
-                Ok(a) => a,
+                Ok(a) => a as u64,
                 Err(err) => {
                     let mut err_map = HashMap::new();
                     err_map.insert("error".to_string(), Err(err));
@@ -142,11 +142,26 @@ mod nodes {
             dbg!(amount);
             dbg!(token_id);
 
-            let bucket = Bucket {
-                amount: amount as u64,
-                token_id: token_id as u64,
-                from,
+            let state = self.state_db.read().unwrap();
+            let balance = match state.get_u64(&format!("token_id-{}", token_id.to_string()), from.as_bytes()) {
+                Ok(b) => b.unwrap_or(0),
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err.into()));
+                    return Rc::new(err_map);
+                },
             };
+
+            let new_balance = match balance.checked_sub(amount) {
+                Some(x) => x,
+                None => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(anyhow!("Not enough funds to create bucket")));
+                    return Rc::new(err_map);
+                },
+            };
+
+            let bucket = Bucket { amount, token_id, from };
             dbg!(&bucket);
             map.insert("default".to_string(), Ok(IOData { data: Box::new(()) }));
             map.insert("bucket".to_string(), Ok(IOData { data: Box::new(bucket) }));
@@ -420,6 +435,14 @@ impl FlowInstance {
         let output = engine.process(&self.nodes, self.start_node);
         dbg!(&output);
         let od = output.expect("engine process failed");
+        if let Some(err) = od.get("error") {
+            match err {
+                Ok(_) => todo!("Unexpected Ok result returned from error"),
+                Err(e) => {
+                    return Err(DigitalAssetError::InstructionFailed { inner: e.to_string() });
+                },
+            }
+        }
         let inner = state_db.read().map(|s| s.deref().clone()).unwrap();
         Ok(inner)
     }

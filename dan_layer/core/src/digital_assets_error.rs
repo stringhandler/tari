@@ -37,6 +37,8 @@ use crate::{
 pub enum DigitalAssetError {
     #[error("Unknown method: {method_name}")]
     _UnknownMethod { method_name: String },
+    #[error("The instruction execution failed. Inner error:{inner}")]
+    InstructionFailed { inner: String },
     #[error("Missing argument at position {position} (name: {argument_name}")]
     MissingArgument { argument_name: String, position: usize },
     #[error("Invalid sig, TODO: fill in deets")]

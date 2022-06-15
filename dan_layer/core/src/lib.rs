@@ -30,3 +30,5 @@ pub mod template_command;
 pub mod templates;
 pub mod types;
 pub mod workers;
+#[macro_use]
+extern crate anyhow;
