@@ -261,9 +261,10 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             current_view.view_id()
         );
 
-        let state_root = payload_processor
+        let state = payload_processor
             .process_payload(node.payload(), state_tx.clone())
             .await?;
+        let state_root = state.calculate_root()?;
 
         if state_root != *node.state_root() {
             warn!(
@@ -275,6 +276,8 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             );
             return Ok(None);
         }
+
+        *state_tx = state;
 
         debug!(
             target: LOG_TARGET,
@@ -334,12 +337,14 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
 
         if view_id.is_genesis() {
             let payload = payload_provider.create_genesis_payload(asset_definition);
-            let state_root = payload_processor.process_payload(&payload, state_db).await?;
+            let state = payload_processor.process_payload(&payload, state_db.clone()).await?;
+            let state_root = state.calculate_root()?;
             Ok(HotStuffTreeNode::genesis(payload, state_root))
         } else {
             let payload = payload_provider.create_payload().await?;
 
-            let state_root = payload_processor.process_payload(&payload, state_db).await?;
+            let state = payload_processor.process_payload(&payload, state_db.clone()).await?;
+            let state_root = state.calculate_root()?;
             Ok(HotStuffTreeNode::from_parent(
                 parent,
                 payload,

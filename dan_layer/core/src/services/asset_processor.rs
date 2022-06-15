@@ -20,7 +20,14 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::{any::Any, collections::HashMap, convert::TryInto, fs};
+use std::{
+    any::Any,
+    collections::HashMap,
+    convert::TryInto,
+    fs,
+    ops::Deref,
+    sync::{Arc, RwLock},
+};
 
 use d3ne::{
     engine::Engine,
@@ -57,11 +64,11 @@ use crate::{
 pub trait AssetProcessor: Sync + Send + 'static {
     // purposefully made sync, because instructions should be run in order, and complete before the
     // next one starts. There may be a better way to enforce this though...
-    fn execute_instruction<TUnitOfWork: StateDbUnitOfWork>(
+    fn execute_instruction<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         instruction: &Instruction,
-        db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError>;
+        db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError>;
 
     fn invoke_read_method<TUnitOfWorkReader: StateDbUnitOfWorkReader>(
         &self,
@@ -75,13 +82,20 @@ pub struct WasmModule {}
 impl WasmModule {}
 
 mod nodes {
-    use std::{collections::HashMap, rc::Rc};
+    use std::{
+        collections::HashMap,
+        rc::Rc,
+        sync::{Arc, RwLock},
+    };
 
     use d3ne::node::{IOData, InputData, Node, OutputData};
     use tari_common_types::types::PublicKey;
     use tari_utilities::hex::Hex;
 
-    use crate::services::asset_processor::{ArgValue, Bucket, Worker};
+    use crate::{
+        services::asset_processor::{ArgValue, Bucket, Worker},
+        storage::state::StateDbUnitOfWork,
+    };
 
     pub struct StartWorker {}
 
@@ -93,9 +107,11 @@ mod nodes {
             Rc::new(map)
         }
     }
-    pub struct CreateBucketWorker {}
+    pub struct CreateBucketWorker<TUnitOfWork: StateDbUnitOfWork> {
+        pub state_db: Arc<RwLock<TUnitOfWork>>,
+    }
 
-    impl Worker for CreateBucketWorker {
+    impl<TUnitOfWork: StateDbUnitOfWork> Worker for CreateBucketWorker<TUnitOfWork> {
         fn call(&self, node: Node, inputs: InputData) -> OutputData {
             dbg!("create_bucket");
             let mut map = HashMap::new();
@@ -248,14 +264,21 @@ impl CallableWorkers for TariWorkers {
     }
 }
 
-fn load_workers(args: HashMap<String, ArgValue>, sender: PublicKey) -> TariWorkers {
+fn load_workers<TUnitOfWork: StateDbUnitOfWork + 'static>(
+    args: HashMap<String, ArgValue>,
+    sender: PublicKey,
+    state_db: Arc<RwLock<TUnitOfWork>>,
+) -> TariWorkers {
+    // let state = Arc::new(RwLock::new(state_db));
     let mut workers = TariWorkers::new();
     workers
         .map
         .insert("core::start".to_string(), Box::new(nodes::StartWorker {}));
     workers.map.insert(
         "tari::create_bucket".to_string(),
-        Box::new(nodes::CreateBucketWorker {}),
+        Box::new(nodes::CreateBucketWorker {
+            state_db: state_db.clone(),
+        }),
     );
     workers
         .map
@@ -349,12 +372,13 @@ impl FlowInstance {
         })
     }
 
-    pub fn process(
+    pub fn process<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         args: &[u8],
         arg_defs: &[WasmFunctionArgDef],
         sender: PublicKey,
-    ) -> Result<(), DigitalAssetError> {
+        state_db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         let mut engine_args = HashMap::new();
 
         let mut remaining_args = Vec::from(args);
@@ -388,11 +412,16 @@ impl FlowInstance {
             engine_args.insert(ad.name.clone(), value);
         }
 
-        let engine = Engine::new("tari@0.1.0", Box::new(load_workers(engine_args, sender)));
+        let state_db = Arc::new(RwLock::new(state_db));
+        let engine = Engine::new(
+            "tari@0.1.0",
+            Box::new(load_workers(engine_args, sender, state_db.clone())),
+        );
         let output = engine.process(&self.nodes, self.start_node);
         dbg!(&output);
         let od = output.expect("engine process failed");
-        Ok(())
+        let inner = state_db.read().map(|s| s.deref().clone()).unwrap();
+        Ok(inner)
     }
 }
 
@@ -417,17 +446,17 @@ impl FlowFactory {
         Self { flows }
     }
 
-    pub fn invoke_write_method<TUnitOfWork: StateDbUnitOfWork>(
+    pub fn invoke_write_method<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         name: String,
         instruction: &Instruction,
-        state_db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError> {
+        state_db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         dbg!("INvoke write");
-        dbg!(&self.flows);
+        // dbg!(&self.flows);
         dbg!(&name);
         if let Some((args, engine)) = self.flows.get(&name) {
-            engine.process(instruction.args(), args, instruction.sender())
+            engine.process(instruction.args(), args, instruction.sender(), state_db)
         } else {
             todo!("could not find engine")
         }
@@ -484,8 +513,8 @@ impl WasmModuleFactory {
         &self,
         name: String,
         instruction: &Instruction,
-        state_db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError> {
+        state_db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         dbg!(&self.functions);
         // TODO: We should probably create a new instance each time, so that
         // there's no stale memory
@@ -564,7 +593,7 @@ impl WasmModuleFactory {
                 let args: Vec<Val> = args.into_iter().flatten().collect();
                 let result = func_pointer.call(args.as_slice()).expect("invokation error");
                 dbg!(&result);
-                Ok(())
+                Ok(state_db)
             } else {
                 todo!("No module found")
             }
@@ -600,11 +629,11 @@ impl ConcreteAssetProcessor {
 }
 
 impl AssetProcessor for ConcreteAssetProcessor {
-    fn execute_instruction<TUnitOfWork: StateDbUnitOfWork>(
+    fn execute_instruction<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         instruction: &Instruction,
-        state_db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError> {
+        state_db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         match self.function_interface.find_executor(instruction)? {
             InstructionExecutor::WasmModule { name } => {
                 self.wasm_factory.invoke_write_method(name, instruction, state_db)
@@ -661,18 +690,20 @@ impl TemplateFactory {
     pub fn invoke_write_method<TUnitOfWork: StateDbUnitOfWork>(
         &self,
         instruction: &Instruction,
-        state_db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError> {
+        state_db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         use TemplateId::{Tip002, Tip003, Tip004, Tip721};
+        let mut state_db = state_db;
         match instruction.template_id() {
-            Tip002 => tip002_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
+            Tip002 => tip002_template::invoke_write_method(instruction.method(), instruction.args(), &mut state_db),
             Tip003 => todo!(),
-            Tip004 => tip004_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
-            Tip721 => tip721_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
+            Tip004 => tip004_template::invoke_write_method(instruction.method(), instruction.args(), &mut state_db),
+            Tip721 => tip721_template::invoke_write_method(instruction.method(), instruction.args(), &mut state_db),
             _ => {
                 todo!()
             },
-        }
+        };
+        Ok(state_db)
     }
 }
 

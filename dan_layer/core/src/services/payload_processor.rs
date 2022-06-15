@@ -21,6 +21,7 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use async_trait::async_trait;
+use log::*;
 
 use crate::{
     digital_assets_error::DigitalAssetError,
@@ -29,13 +30,15 @@ use crate::{
     storage::state::StateDbUnitOfWork,
 };
 
+const LOG_TARGET: &str = "tari::dan::services::payload_processor";
+
 #[async_trait]
 pub trait PayloadProcessor<TPayload: Payload> {
-    async fn process_payload<TUnitOfWork: StateDbUnitOfWork>(
+    async fn process_payload<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         payload: &TPayload,
         unit_of_work: TUnitOfWork,
-    ) -> Result<StateRoot, DigitalAssetError>;
+    ) -> Result<TUnitOfWork, DigitalAssetError>;
 }
 
 pub struct TariDanPayloadProcessor<TAssetProcessor>
@@ -54,19 +57,24 @@ impl<TAssetProcessor: AssetProcessor> TariDanPayloadProcessor<TAssetProcessor> {
 impl<TAssetProcessor: AssetProcessor + Send + Sync> PayloadProcessor<TariDanPayload>
     for TariDanPayloadProcessor<TAssetProcessor>
 {
-    async fn process_payload<TUnitOfWork: StateDbUnitOfWork>(
+    async fn process_payload<TUnitOfWork: StateDbUnitOfWork + 'static>(
         &self,
         payload: &TariDanPayload,
         state_tx: TUnitOfWork,
-    ) -> Result<StateRoot, DigitalAssetError> {
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         let mut state_tx = state_tx;
         for instruction in payload.instructions() {
-            println!("Executing instruction");
-            println!("{:?}", instruction);
-            // TODO: Should we swallow + log the error instead of propagating it?
-            self.asset_processor.execute_instruction(instruction, &mut state_tx)?;
+            match self.asset_processor.execute_instruction(instruction, state_tx.clone()) {
+                Ok(new_state) => state_tx = new_state,
+                Err(e) => {
+                    // TODO: Should the node crash instead?
+                    error!(target: LOG_TARGET, "Could not process instruction:{}", instruction);
+
+                    // The state will be rolled back
+                },
+            }
         }
 
-        Ok(state_tx.calculate_root()?)
+        Ok(state_tx)
     }
 }

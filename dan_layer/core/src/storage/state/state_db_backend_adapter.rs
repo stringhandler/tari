@@ -27,7 +27,7 @@ use crate::storage::{
     StorageError,
 };
 
-pub trait StateDbBackendAdapter: Send + Sync + Clone {
+pub trait StateDbBackendAdapter: Send + Sync + Clone + 'static {
     type BackendTransaction;
     type Error: Into<StorageError>;
 

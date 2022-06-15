@@ -44,7 +44,7 @@ use crate::{
 
 const LOG_TARGET: &str = "tari::dan::state_db";
 
-pub trait StateDbUnitOfWork: StateDbUnitOfWorkReader {
+pub trait StateDbUnitOfWork: StateDbUnitOfWorkReader + 'static {
     fn set_value(&mut self, schema: String, key: Vec<u8>, value: Vec<u8>) -> Result<(), StorageError>;
     fn set_u64(&mut self, schema: &str, key: &[u8], value: u64) -> Result<(), StorageError>;
     fn commit(&mut self) -> Result<(), StorageError>;
@@ -85,14 +85,14 @@ impl UnitOfWorkContext {
 }
 
 pub struct StateDbUnitOfWorkImpl<TBackendAdapter: StateDbBackendAdapter> {
-    inner: Arc<RwLock<StateDbUnitOfWorkInner<TBackendAdapter>>>,
+    inner: StateDbUnitOfWorkInner<TBackendAdapter>,
     context: UnitOfWorkContext,
 }
 
 impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkImpl<TBackendAdapter> {
     pub fn new(context: UnitOfWorkContext, backend_adapter: TBackendAdapter) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(StateDbUnitOfWorkInner::new(backend_adapter))),
+            inner: StateDbUnitOfWorkInner::new(backend_adapter),
             context,
         }
     }
@@ -107,10 +107,10 @@ impl<TBackendAdapter: StateDbBackendAdapter> Clone for StateDbUnitOfWorkImpl<TBa
     }
 }
 
-impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWork for StateDbUnitOfWorkImpl<TBackendAdapter> {
+impl<TBackendAdapter: StateDbBackendAdapter + 'static> StateDbUnitOfWork for StateDbUnitOfWorkImpl<TBackendAdapter> {
     fn set_value(&mut self, schema: String, key: Vec<u8>, value: Vec<u8>) -> Result<(), StorageError> {
-        let mut inner = self.inner.write()?;
-        inner
+        // let mut inner = self.inner;
+        self.inner
             .updates
             .push(UnitOfWorkTracker::new(DbKeyValue { schema, key, value }, true));
 
@@ -122,8 +122,9 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWork for StateDbUnitOf
     }
 
     fn commit(&mut self) -> Result<(), StorageError> {
-        let mut inner = self.inner.write()?;
-        let tx = inner
+        // let mut inner = self.inner;
+        let tx = self
+            .inner
             .backend_adapter
             .create_transaction()
             .map_err(TBackendAdapter::Error::into)?;
@@ -167,7 +168,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWork for StateDbUnitOf
     /// Clears the state db immediately (before commit) - this will not be needed in future when build up the state from
     /// instructions/op logs
     fn clear_all_state(&self) -> Result<(), StorageError> {
-        let inner = self.inner.write()?;
+        let inner = self.inner;
         let tx = inner
             .backend_adapter
             .create_transaction()
@@ -185,7 +186,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_value(&self, schema: &str, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        let inner = self.inner.read()?;
+        let inner = self.inner;
         // Hit the DB.
         inner
             .backend_adapter
@@ -206,7 +207,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn find_keys_by_value(&self, schema: &str, value: &[u8]) -> Result<Vec<Vec<u8>>, StorageError> {
-        let inner = self.inner.read()?;
+        let inner = self.inner;
         inner
             .backend_adapter
             .find_keys_by_value(schema, value)
@@ -214,7 +215,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn calculate_root(&self) -> Result<StateRoot, StorageError> {
-        let inner = self.inner.read()?;
+        let inner = self.inner;
         let tx = inner
             .backend_adapter
             .create_transaction()
@@ -267,7 +268,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_all_state(&self) -> Result<Vec<SchemaState>, StorageError> {
-        let inner = self.inner.read()?;
+        let inner = self.inner;
         let tx = inner
             .backend_adapter
             .create_transaction()
@@ -298,7 +299,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_op_logs_for_height(&self, height: u64) -> Result<Vec<StateOpLogEntry>, StorageError> {
-        let inner = self.inner.read()?;
+        let inner = self.inner;
         let tx = inner
             .backend_adapter
             .create_transaction()
@@ -315,7 +316,7 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
 }
 
 fn find_update<TBackendAdapter: StateDbBackendAdapter>(
-    inner: &RwLockReadGuard<StateDbUnitOfWorkInner<TBackendAdapter>>,
+    inner: &StateDbUnitOfWorkInner<TBackendAdapter>,
     schema: &str,
     key: &[u8],
 ) -> Option<Vec<u8>> {
@@ -328,6 +329,7 @@ fn find_update<TBackendAdapter: StateDbBackendAdapter>(
     None
 }
 
+#[derive(Clone)]
 pub struct StateDbUnitOfWorkInner<TBackendAdapter: StateDbBackendAdapter> {
     backend_adapter: TBackendAdapter,
     updates: Vec<UnitOfWorkTracker<DbKeyValue>>,

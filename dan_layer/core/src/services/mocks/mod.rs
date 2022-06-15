@@ -272,7 +272,7 @@ impl<TPayload: Payload> PayloadProcessor<TPayload> for MockPayloadProcessor {
         &self,
         _payload: &TPayload,
         _unit_of_work: TUnitOfWork,
-    ) -> Result<StateRoot, DigitalAssetError> {
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         todo!()
     }
 }
@@ -284,8 +284,8 @@ impl AssetProcessor for MockAssetProcessor {
     fn execute_instruction<TUnitOfWork: StateDbUnitOfWork>(
         &self,
         _instruction: &Instruction,
-        _db: &mut TUnitOfWork,
-    ) -> Result<(), DigitalAssetError> {
+        _db: TUnitOfWork,
+    ) -> Result<TUnitOfWork, DigitalAssetError> {
         todo!()
     }
 
