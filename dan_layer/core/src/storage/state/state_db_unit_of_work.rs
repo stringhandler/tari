@@ -137,6 +137,7 @@ impl<TBackendAdapter: StateDbBackendAdapter + 'static> StateDbUnitOfWork for Sta
             "Committing {} state update(s)",
             self.inner.updates.len()
         );
+        dbg!(&self.inner.updates);
         for item in &self.inner.updates {
             let i = item.get();
             self.inner
@@ -190,11 +191,15 @@ impl<TBackendAdapter: StateDbBackendAdapter> StateDbUnitOfWorkReader for StateDb
     }
 
     fn get_value(&self, schema: &str, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        // Hit the DB.
-        self.inner
-            .backend_adapter
-            .get(schema, key)
-            .map_err(TBackendAdapter::Error::into)
+        if let Some(updated_value) = find_update(&self.inner, &schema, key) {
+            Ok(Some(updated_value))
+        } else {
+            // Hit the DB.
+            self.inner
+                .backend_adapter
+                .get(schema, key)
+                .map_err(TBackendAdapter::Error::into)
+        }
     }
 
     fn get_u64(&self, schema: &str, key: &[u8]) -> Result<Option<u64>, StorageError> {

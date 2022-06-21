@@ -20,7 +20,13 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::{collections::HashMap, fmt, marker::PhantomData, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt,
+    fmt::{Display, Formatter},
+    marker::PhantomData,
+    path::PathBuf,
+};
 
 use serde::{self, de, Deserialize, Deserializer, Serialize};
 use serde_json::Value as JsValue;
@@ -161,6 +167,17 @@ pub enum ArgType {
     Byte,
     PublicKey,
     Uint,
+}
+
+impl Display for ArgType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ArgType::String => write!(f, "string"),
+            ArgType::Byte => write!(f, "byte"),
+            ArgType::PublicKey => write!(f, "public_key"),
+            ArgType::Uint => write!(f, "uint"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]

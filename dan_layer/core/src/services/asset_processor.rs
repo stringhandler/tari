@@ -142,8 +142,9 @@ mod nodes {
             dbg!(amount);
             dbg!(token_id);
 
-            let state = self.state_db.read().unwrap();
-            let balance = match state.get_u64(&format!("token_id-{}", token_id.to_string()), from.as_bytes()) {
+            let mut state = self.state_db.write().unwrap();
+            let balance_key = format!("token_id-{}", token_id.to_string());
+            let balance = match state.get_u64(&balance_key, from.as_bytes()) {
                 Ok(b) => b.unwrap_or(0),
                 Err(err) => {
                     let mut err_map = HashMap::new();
@@ -160,8 +161,16 @@ mod nodes {
                     return Rc::new(err_map);
                 },
             };
+            match state.set_u64(&balance_key, from.as_bytes(), new_balance) {
+                Ok(_) => (),
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err.into()));
+                    return Rc::new(err_map);
+                },
+            }
 
-            let bucket = Bucket { amount, token_id, from };
+            let bucket = Bucket { amount, token_id };
             dbg!(&bucket);
             map.insert("default".to_string(), Ok(IOData { data: Box::new(()) }));
             map.insert("bucket".to_string(), Ok(IOData { data: Box::new(bucket) }));
@@ -169,9 +178,49 @@ mod nodes {
         }
     }
 
-    pub struct EmptyBucketWorker {}
+    pub struct MintBucketWorker {}
 
-    impl Worker for EmptyBucketWorker {
+    impl Worker for MintBucketWorker {
+        fn call(&self, node: Node, inputs: InputData) -> OutputData {
+            let mut map = HashMap::new();
+            let amount = match node.get_number_field("amount", &inputs) {
+                Ok(a) => a as u64,
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err));
+                    return Rc::new(err_map);
+                },
+            };
+            let token_id = match node.get_number_field("token_id", &inputs) {
+                Ok(a) => a as u64,
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err));
+                    return Rc::new(err_map);
+                },
+            };
+
+            let asset_id = match node.get_number_field("asset_id", &inputs) {
+                Ok(a) => a as u64,
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err));
+                    return Rc::new(err_map);
+                },
+            };
+            let bucket = Bucket { amount, token_id };
+            dbg!(&bucket);
+            map.insert("default".to_string(), Ok(IOData { data: Box::new(()) }));
+            map.insert("bucket".to_string(), Ok(IOData { data: Box::new(bucket) }));
+            Rc::new(map)
+        }
+    }
+
+    pub struct EmptyBucketWorker<TUnitOfWork: StateDbUnitOfWork> {
+        pub state_db: Arc<RwLock<TUnitOfWork>>,
+    }
+
+    impl<TUnitOfWork: StateDbUnitOfWork> Worker for EmptyBucketWorker<TUnitOfWork> {
         fn call(&self, node: Node, inputs: InputData) -> OutputData {
             dbg!("empty");
             let mut map = HashMap::new();
@@ -195,6 +244,29 @@ mod nodes {
 
             dbg!(&bucket);
             dbg!(&to);
+            let mut state = self.state_db.write().unwrap();
+            let balance_key = format!("token_id-{}", bucket.token_id.to_string());
+            let balance = match state.get_u64(&balance_key, to.as_bytes()) {
+                Ok(b) => b.unwrap_or(0),
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err.into()));
+                    return Rc::new(err_map);
+                },
+            };
+            match state.set_u64(
+                &balance_key,
+                to.as_bytes(),
+                bucket.amount.checked_add(balance).expect("overflowed"),
+            ) {
+                Ok(_) => (),
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err.into()));
+                    return Rc::new(err_map);
+                },
+            }
+
             map.insert("default".to_string(), Ok(IOData { data: Box::new(()) }));
             // map.insert("bucket".to_string(), Ok(IOData { data: Box::new(bucket) }));
             Rc::new(map)
@@ -250,13 +322,54 @@ mod nodes {
             Rc::new(map)
         }
     }
+
+    pub struct TextWorker {}
+
+    impl Worker for TextWorker {
+        fn call(&self, node: Node, inputs: InputData) -> OutputData {
+            dbg!("text");
+            let txt = node.get_string_field("txt", &inputs).unwrap();
+            dbg!(&txt);
+            let mut map = HashMap::new();
+            map.insert("txt".to_string(), Ok(IOData { data: Box::new(txt) }));
+            Rc::new(map)
+        }
+    }
+
+    pub struct HasRoleWorker<TUnitOfWork: StateDbUnitOfWork> {
+        pub state_db: Arc<RwLock<TUnitOfWork>>,
+    }
+    impl<TUnitOfWork: StateDbUnitOfWork> Worker for HasRoleWorker<TUnitOfWork> {
+        fn call(&self, node: Node, inputs: InputData) -> OutputData {
+            dbg!("has role");
+            let role = node.get_string_field("role", &inputs).unwrap();
+            dbg!(&role);
+
+            let pubkey = match node.get_string_field("pubkey", &inputs) {
+                Ok(a) => PublicKey::from_hex(&a).expect("Not a valid pub key"),
+                Err(err) => {
+                    let mut err_map = HashMap::new();
+                    err_map.insert("error".to_string(), Err(err));
+                    return Rc::new(err_map);
+                },
+            };
+
+            dbg!(&pubkey);
+
+            // let state = self.state_db.read().expect("Could not get lock on data");
+            // state.get_value()
+            // TODO: read roles from db
+            let mut map = HashMap::new();
+            map.insert("default".to_string(), Ok(IOData { data: Box::new(()) }));
+            Rc::new(map)
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct Bucket {
     amount: u64,
     token_id: u64,
-    from: PublicKey,
 }
 
 trait Worker {
@@ -295,9 +408,12 @@ fn load_workers<TUnitOfWork: StateDbUnitOfWork + 'static>(
             state_db: state_db.clone(),
         }),
     );
-    workers
-        .map
-        .insert("tari::empty_bucket".to_string(), Box::new(nodes::EmptyBucketWorker {}));
+    workers.map.insert(
+        "tari::empty_bucket".to_string(),
+        Box::new(nodes::EmptyBucketWorker {
+            state_db: state_db.clone(),
+        }),
+    );
     workers.map.insert(
         "core::arg".to_string(),
         Box::new(nodes::ArgWorker { args: args.clone() }),
@@ -308,6 +424,16 @@ fn load_workers<TUnitOfWork: StateDbUnitOfWork + 'static>(
     workers
         .map
         .insert("core::sender".to_string(), Box::new(nodes::SenderWorker { sender }));
+    workers.map.insert("Text".to_string(), Box::new(nodes::TextWorker {}));
+    workers.map.insert(
+        "tari::has_role".to_string(),
+        Box::new(nodes::HasRoleWorker {
+            state_db: state_db.clone(),
+        }),
+    );
+    workers
+        .map
+        .insert("tari::mint_bucket".to_string(), Box::new(nodes::MintBucketWorker {}));
     workers
 }
 

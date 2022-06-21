@@ -22,6 +22,8 @@
 syntax = "proto3";
 
 import "types.proto";
+import "google/protobuf/any.proto";
+
 package tari.rpc;
 
 service ValidatorNode {
@@ -31,8 +33,35 @@ service ValidatorNode {
 //    rpc ExecuteInstruction(ExecuteInstructionRequest) returns (ExecuteInstructionResponse);
     rpc InvokeReadMethod(InvokeReadMethodRequest) returns (InvokeReadMethodResponse);
     rpc InvokeMethod(InvokeMethodRequest) returns (InvokeMethodResponse);
+    rpc InvokeMethod2(InvokeMethod2Request) returns (InvokeMethodResponse);
+    rpc GetFunctionInterface(GetFunctionInterfaceRequest) returns (GetFunctionInterfaceResponse);
 }
 
+message GetFunctionInterfaceRequest  {
+    bytes asset_public_key = 1;
+}
+
+message GetFunctionInterfaceResponse {
+    repeated FunctionMetadata functions = 1;
+}
+
+message FunctionMetadata {
+    string name = 1;
+    repeated ArgMetadata args = 2;
+}
+
+message ArgMetadata {
+    string name = 1;
+    string arg_type = 2;
+}
+
+message InvokeMethod2Request {
+    bytes asset_public_key = 1;
+    uint32 template_id = 2;
+    string method = 3;
+    bytes sender = 4;
+    google.protobuf.Any args = 5;
+}
 
 message GetMetadataRequest {
     // empty

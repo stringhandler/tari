@@ -34,6 +34,7 @@ mod monitoring;
 mod p2p;
 
 use std::{
+    collections::HashMap,
     fs::File,
     io::BufReader,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -223,9 +224,12 @@ async fn start_debug_mode(
         db_factory.clone(),
     );
 
+    let mut asset_defs = HashMap::new();
+    asset_defs.insert(asset_definition.public_key.clone(), asset_definition.clone());
     let grpc_server: ValidatorNodeGrpcServer<DebugServiceSpecification> = ValidatorNodeGrpcServer::new(
         node_identity.as_ref().clone(),
         db_factory.clone(),
+        asset_defs,
         asset_processor,
         asset_proxy,
     );

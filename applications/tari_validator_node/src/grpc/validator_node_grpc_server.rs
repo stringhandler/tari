@@ -19,14 +19,14 @@
 // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-use std::convert::TryInto;
+use std::{collections::HashMap, convert::TryInto};
 
 use tari_app_grpc::tari_rpc as rpc;
 use tari_common_types::types::PublicKey;
 use tari_comms::NodeIdentity;
 use tari_crypto::tari_utilities::ByteArray;
 use tari_dan_core::{
-    models::Instruction,
+    models::{AssetDefinition, Instruction},
     services::{AssetProcessor, AssetProxy, ServiceSpecification},
     storage::DbFactory,
 };
@@ -35,6 +35,7 @@ use tonic::{Request, Response, Status};
 pub struct ValidatorNodeGrpcServer<TServiceSpecification: ServiceSpecification> {
     node_identity: NodeIdentity,
     db_factory: TServiceSpecification::DbFactory,
+    asset_definitions: HashMap<PublicKey, AssetDefinition>,
     asset_processor: TServiceSpecification::AssetProcessor,
     asset_proxy: TServiceSpecification::AssetProxy,
 }
@@ -43,12 +44,14 @@ impl<TServiceSpecification: ServiceSpecification> ValidatorNodeGrpcServer<TServi
     pub fn new(
         node_identity: NodeIdentity,
         db_factory: TServiceSpecification::DbFactory,
+        asset_definitions: HashMap<PublicKey, AssetDefinition>,
         asset_processor: TServiceSpecification::AssetProcessor,
         asset_proxy: TServiceSpecification::AssetProxy,
     ) -> Self {
         Self {
             node_identity,
             db_factory,
+            asset_definitions,
             asset_processor,
             asset_proxy,
         }
@@ -76,6 +79,49 @@ impl<TServiceSpecification: ServiceSpecification + 'static> rpc::validator_node_
         _request: tonic::Request<rpc::GetTokenDataRequest>,
     ) -> Result<tonic::Response<rpc::GetTokenDataResponse>, tonic::Status> {
         Err(Status::internal("Oh noes"))
+    }
+
+    async fn get_function_interface(
+        &self,
+        request: Request<rpc::GetFunctionInterfaceRequest>,
+    ) -> Result<Response<rpc::GetFunctionInterfaceResponse>, tonic::Status> {
+        let request = request.into_inner();
+        dbg!(&request);
+        let asset_public_key = PublicKey::from_bytes(&request.asset_public_key)
+            .map_err(|_err| Status::invalid_argument("asset_public_key was not a valid public key"))?;
+
+        if let Some(def) = self.asset_definitions.get(&asset_public_key) {
+            let response = rpc::GetFunctionInterfaceResponse {
+                functions: def
+                    .flow_functions
+                    .iter()
+                    .map(|func| rpc::FunctionMetadata {
+                        name: func.name.clone(),
+                        args: func
+                            .args
+                            .iter()
+                            .map(|a| rpc::ArgMetadata {
+                                name: a.name.clone(),
+                                arg_type: a.arg_type.to_string(),
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            };
+
+            Ok(Response::new(response))
+        } else {
+            Err(Status::not_found("No asset definition for that public key"))
+        }
+    }
+
+    async fn invoke_method2(
+        &self,
+        request: Request<rpc::InvokeMethod2Request>,
+    ) -> Result<Response<rpc::InvokeMethodResponse>, Status> {
+        let request = request.into_inner();
+        dbg!(&request);
+        todo!()
     }
 
     async fn invoke_method(
