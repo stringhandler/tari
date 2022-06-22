@@ -8,8 +8,8 @@
   },
   "author": "Tari development community",
   "dependencies": {
-    "@grpc/grpc-js": "^1.2.3",
-    "@grpc/proto-loader": "^0.5.5",
+    "@grpc/grpc-js": "^1.6.7",
+    "@grpc/proto-loader": "^0.6.13",
     "grpc-promise": "^1.4.0"
   },
   "devDependencies": {

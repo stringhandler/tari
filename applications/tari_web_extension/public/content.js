@@ -39,6 +39,9 @@ function script() {
     checkAccounts() {
       return createTimeoutPromise({ action: "tari-get-accounts" });
     }
+    request(assetPublicKey, method, args) {
+      return createTimeoutPromise({action: "tari-request"}, 1000);
+    }
     getSelectedAsset(timeout_ms = 1000) {
       return createTimeoutPromise(
         { action: "tari-get-selected-asset" },

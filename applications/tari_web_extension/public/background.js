@@ -101,6 +101,10 @@ const getSeedWords = (origin) => ({
   },
 });
 
+const doRequest = (request) => {
+
+}
+
 function messageCallback(request, sender, sendResponse) {
   const { origin } = sender;
   console.log("messageCallback", request, origin);
@@ -135,6 +139,8 @@ function messageCallback(request, sender, sendResponse) {
     case "tari-get-seedwords":
       sendResponse(getSeedWords(origin));
       break;
+    case "tari-request":
+      doRequest(request);
     default:
       console.log("unknown message", request?.action);
       break;
