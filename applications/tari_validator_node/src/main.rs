@@ -30,6 +30,7 @@ mod dan_node;
 mod debug;
 mod default_service_specification;
 mod grpc;
+mod json_rpc;
 mod monitoring;
 mod p2p;
 
@@ -85,6 +86,7 @@ use crate::{
         services::{base_node_client::GrpcBaseNodeClient, wallet_client::GrpcWalletClient},
         validator_node_grpc_server::ValidatorNodeGrpcServer,
     },
+    json_rpc::validator_node_json_rpc_server::ValidatorNodeJsonRpcServer,
     p2p::services::rpc_client::TariCommsValidatorNodeClientFactory,
 };
 
@@ -229,14 +231,21 @@ async fn start_debug_mode(
     let grpc_server: ValidatorNodeGrpcServer<DebugServiceSpecification> = ValidatorNodeGrpcServer::new(
         node_identity.as_ref().clone(),
         db_factory.clone(),
-        asset_defs,
-        asset_processor,
+        asset_defs.clone(),
+        asset_processor.clone(),
         asset_proxy,
     );
     let grpc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 18144);
 
     let checkpoint_manager = MemoryCheckpointManager {};
     task::spawn(run_grpc(grpc_server, grpc_addr, shutdown.to_signal()));
+
+    let jsonrpc_server = ValidatorNodeJsonRpcServer::<DebugServiceSpecification>::new(asset_defs, asset_processor);
+    task::spawn(jsonrpc_server.run(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 18154),
+        shutdown.to_signal(),
+    ));
+
     println!("🚀 Validator node started!");
     println!("{}", node_identity);
     run_dan_node::<DebugServiceSpecification>(
