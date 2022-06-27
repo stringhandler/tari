@@ -14,6 +14,7 @@ members = [
     "comms/dht",
     "comms/rpc_macros",
     "dan_layer/core",
+    "dan_layer/engine",
     "dan_layer/storage_sqlite",
     "dan_layer/dan_wallet",
     "dan_layer/dan_wallet_ffi",
