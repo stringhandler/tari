@@ -78,7 +78,7 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         &mut self,
         timeout: Duration,
         current_view: &View,
-        inbound_services: &mut TSpecification::InboundConnectionService,
+        inbound_services: &TSpecification::InboundConnectionService,
         outbound_service: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
         mut unit_of_work: TUnitOfWork,

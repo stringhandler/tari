@@ -1,4 +1,4 @@
-//  Copyright 2021. The Tari Project
+//  Copyright 2022. The Tari Project
 //
 //  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 //  following conditions are met:
@@ -20,45 +20,7 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use tari_common_types::types::PublicKey;
-
-use crate::{
-    digital_assets_error::DigitalAssetError,
-    models::{shard::Shard, BaseLayerOutput, Committee},
-    services::infrastructure_services::NodeAddressable,
-};
-
-pub trait CommitteeManager<TAddr: NodeAddressable> {
-    fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError>;
-
-    fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError>;
-
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<TAddr>, DigitalAssetError>;
-}
-
-pub struct ConcreteCommitteeManager {
-    committee: Committee<PublicKey>,
-}
-
-impl ConcreteCommitteeManager {
-    pub fn new(committee: Committee<PublicKey>) -> Self {
-        Self { committee }
-    }
-}
-
-impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
-    fn current_committee(&self) -> Result<&Committee<PublicKey>, DigitalAssetError> {
-        Ok(&self.committee)
-    }
-
-    fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError> {
-        // TODO: better error
-        let committee = output.get_side_chain_committee().unwrap();
-        self.committee = Committee::new(committee.to_vec());
-        Ok(())
-    }
-
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<PublicKey>, DigitalAssetError> {
-        todo!()
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Shard {
+    pub id: u64,
 }

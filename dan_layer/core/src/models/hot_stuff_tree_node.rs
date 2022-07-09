@@ -24,7 +24,7 @@ use digest::{Digest, FixedOutput};
 use tari_crypto::common::Blake256;
 use tari_dan_engine::state::models::StateRoot;
 
-use crate::models::{Payload, TreeNodeHash};
+use crate::models::{shard::Shard, Payload, TreeNodeHash};
 
 #[derive(Debug, Clone)]
 pub struct HotStuffTreeNode<TPayload: Payload> {
@@ -33,6 +33,7 @@ pub struct HotStuffTreeNode<TPayload: Payload> {
     state_root: StateRoot,
     hash: TreeNodeHash,
     height: u32,
+    involved_shards: Vec<Shard>,
 }
 
 impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
@@ -43,6 +44,7 @@ impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
             state_root,
             hash: TreeNodeHash::zero(),
             height,
+            involved_shards: vec![],
         };
         s.hash = s.calculate_hash();
         s
@@ -55,6 +57,7 @@ impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
             hash: TreeNodeHash::zero(),
             state_root,
             height: 0,
+            involved_shards: vec![],
         };
         s.hash = s.calculate_hash();
         s
@@ -97,6 +100,10 @@ impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
 
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    pub fn involved_shards(&self) -> &[Shard] {
+        self.involved_shards.as_slice()
     }
 }
 

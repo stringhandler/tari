@@ -71,7 +71,11 @@ impl ConsensusHash for TariDanPayload {
     }
 }
 
-impl Payload for TariDanPayload {}
+impl Payload for TariDanPayload {
+    fn empty() -> Self {
+        TariDanPayload::new(InstructionSet::empty(), None)
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct CheckpointData {

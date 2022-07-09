@@ -33,7 +33,11 @@ impl ViewId {
     pub fn current_leader(&self, committee_size: usize) -> usize {
         #[allow(clippy::cast_possible_truncation)]
         let view_id = self.0 as usize;
-        view_id % committee_size
+        if committee_size == 0 {
+            0
+        } else {
+            view_id % committee_size
+        }
     }
 
     pub fn is_genesis(&self) -> bool {

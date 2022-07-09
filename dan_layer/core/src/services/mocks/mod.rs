@@ -20,8 +20,10 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+pub mod mock_shard_mapper;
+
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
@@ -48,6 +50,7 @@ use tari_dan_engine::{
 use crate::{
     digital_assets_error::DigitalAssetError,
     models::{
+        shard::Shard,
         AssetDefinition,
         BaseLayerMetadata,
         BaseLayerOutput,
@@ -67,6 +70,7 @@ use crate::{
         base_node_client::BaseNodeClient,
         infrastructure_services::NodeAddressable,
         AssetProcessor,
+        AssetProxy,
         CommitteeManager,
         ConcreteCheckpointManager,
         EventsPublisher,
@@ -84,7 +88,7 @@ use crate::{
 #[cfg(test)]
 use crate::{
     models::domain_events::ConsensusWorkerDomainEvent,
-    services::infrastructure_services::mocks::{MockInboundConnectionService, MockOutboundService},
+    services::infrastructure_services::mocks::{MockInboundConnectionService, MockOutboundConnectionService},
     services::{ConcreteAssetProxy, ServiceSpecification},
     storage::mocks::{chain_db::MockChainDbBackupAdapter, MockDbFactory},
 };
@@ -127,6 +131,46 @@ pub fn create_mempool_mock() -> MockMempoolService {
     MockMempoolService
 }
 
+pub fn mock_payload_provider<TPayload: Payload>() -> MockPayloadProvider<TPayload> {
+    MockPayloadProvider { payloads: vec![] }
+}
+pub struct MockPayloadProvider<TPayload: Payload> {
+    payloads: Vec<TPayload>,
+}
+
+#[async_trait]
+impl<TPayload: Payload> PayloadProvider<TPayload> for MockPayloadProvider<TPayload> {
+    async fn create_payload(&self) -> Result<TPayload, DigitalAssetError> {
+        Ok(self.payloads[0].clone())
+    }
+
+    fn create_genesis_payload(&self, asset_definition: &AssetDefinition) -> TPayload {
+        TPayload::empty()
+    }
+
+    async fn get_payload_queue(&self) -> usize {
+        self.payloads.len()
+    }
+
+    async fn reserve_payload(
+        &mut self,
+        payload: &TPayload,
+        reservation_key: &TreeNodeHash,
+    ) -> Result<(), DigitalAssetError> {
+        todo!()
+    }
+
+    async fn remove_payload(&mut self, reservation_key: &TreeNodeHash) -> Result<(), DigitalAssetError> {
+        todo!()
+    }
+}
+
+impl<TPayload: Payload> MockPayloadProvider<TPayload> {
+    pub fn push(&mut self, item: TPayload) {
+        self.payloads.push(item);
+    }
+}
+
 pub fn mock_static_payload_provider() -> MockStaticPayloadProvider<TariDanPayload> {
     let instruction_set = InstructionSet::empty();
     let payload = TariDanPayload::new(instruction_set, None);
@@ -166,7 +210,7 @@ impl<TPayload: Payload> PayloadProvider<TPayload> for MockStaticPayloadProvider<
     }
 }
 
-pub fn mock_payload_provider() -> MockStaticPayloadProvider<&'static str> {
+pub fn mock_static_string_payload_provider() -> MockStaticPayloadProvider<&'static str> {
     MockStaticPayloadProvider {
         static_payload: "<Empty>",
     }
@@ -201,8 +245,8 @@ impl<TEvent: Event> EventsPublisher<TEvent> for MockEventsPublisher<TEvent> {
     }
 }
 
-pub fn mock_signing_service() -> MockSigningService<RistrettoPublicKey> {
-    MockSigningService::<RistrettoPublicKey> { p: PhantomData }
+pub fn mock_signing_service<TAddr: NodeAddressable>() -> MockSigningService<TAddr> {
+    MockSigningService::<TAddr> { p: PhantomData }
 }
 
 pub struct MockSigningService<TAddr: NodeAddressable> {
@@ -221,7 +265,10 @@ pub struct MockBaseNodeClient {}
 #[async_trait]
 impl BaseNodeClient for MockBaseNodeClient {
     async fn get_tip_info(&mut self) -> Result<BaseLayerMetadata, DigitalAssetError> {
-        todo!();
+        Ok(BaseLayerMetadata {
+            height_of_longest_chain: 0,
+            tip_hash: Default::default(),
+        })
     }
 
     async fn get_constitutions(
@@ -260,7 +307,7 @@ impl BaseNodeClient for MockBaseNodeClient {
         _contract_id: FixedHash,
         _output_type: OutputType,
     ) -> Result<Vec<BaseLayerOutput>, DigitalAssetError> {
-        todo!()
+        Ok(vec![])
     }
 }
 
@@ -268,18 +315,40 @@ pub fn mock_base_node_client() -> MockBaseNodeClient {
     MockBaseNodeClient {}
 }
 
+pub fn mock_committee_manager<TAddr: NodeAddressable>(
+    committees: Vec<Vec<TAddr>>,
+    in_shard: u64,
+) -> MockCommitteeManager<TAddr> {
+    let mut hs = HashMap::new();
+    for (i, committee) in committees.into_iter().enumerate() {
+        hs.insert(Shard { id: i as u64 }, Committee::new(committee));
+    }
+    MockCommitteeManager {
+        committees: hs,
+        in_shard: Shard { id: in_shard },
+    }
+}
 #[derive(Clone)]
-pub struct MockCommitteeManager {
-    pub committee: Committee<RistrettoPublicKey>,
+pub struct MockCommitteeManager<TAddr: NodeAddressable> {
+    pub committees: HashMap<Shard, Committee<TAddr>>,
+    pub in_shard: Shard,
 }
 
-impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager {
+impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TAddr> {
     fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError> {
-        todo!();
+        Ok(&self.committees[&self.in_shard])
     }
 
     fn read_from_constitution(&mut self, _output: BaseLayerOutput) -> Result<(), DigitalAssetError> {
         todo!();
+    }
+
+    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<TAddr>, DigitalAssetError> {
+        let mut nodes = vec![];
+        for shard in shards {
+            nodes.extend(self.committees[shard].members.iter().cloned());
+        }
+        Ok(nodes)
     }
 }
 
@@ -310,7 +379,7 @@ impl<TPayload: Payload> PayloadProcessor<TPayload> for MockPayloadProcessor {
         _payload: &TPayload,
         _unit_of_work: TUnitOfWork,
     ) -> Result<StateRoot, DigitalAssetError> {
-        todo!()
+        Ok(StateRoot::new(Default::default()))
     }
 }
 
@@ -374,8 +443,13 @@ pub fn mock_wallet_client() -> MockWalletClient {
     MockWalletClient {}
 }
 
+pub fn mock_validator_node_client_factory<TAddr: NodeAddressable>() -> MockValidatorNodeClientFactory<TAddr> {
+    MockValidatorNodeClientFactory { p: Default::default() }
+}
 #[derive(Default, Clone)]
-pub struct MockValidatorNodeClientFactory;
+pub struct MockValidatorNodeClientFactory<TAddr: NodeAddressable> {
+    p: PhantomData<TAddr>,
+}
 
 #[derive(Default, Clone)]
 pub struct MockValidatorNodeClient;
@@ -433,8 +507,8 @@ impl ValidatorNodeRpcClient for MockValidatorNodeClient {
     }
 }
 
-impl ValidatorNodeClientFactory for MockValidatorNodeClientFactory {
-    type Addr = PublicKey;
+impl<TAddr: NodeAddressable> ValidatorNodeClientFactory for MockValidatorNodeClientFactory<TAddr> {
+    type Addr = TAddr;
     type Client = MockValidatorNodeClient;
 
     fn create_client(&self, _address: &Self::Addr) -> Self::Client {
@@ -446,14 +520,14 @@ impl ValidatorNodeClientFactory for MockValidatorNodeClientFactory {
 pub struct MockChainStorageService;
 
 #[async_trait]
-impl ChainStorageService<TariDanPayload> for MockChainStorageService {
+impl<TPayload: Payload> ChainStorageService<TPayload> for MockChainStorageService {
     async fn get_metadata(&self) -> Result<SidechainMetadata, StorageError> {
         todo!()
     }
 
     async fn add_node<TUnitOfWork: ChainDbUnitOfWork>(
         &self,
-        _node: &HotStuffTreeNode<TariDanPayload>,
+        _node: &HotStuffTreeNode<TPayload>,
         _db: TUnitOfWork,
     ) -> Result<(), StorageError> {
         Ok(())
@@ -470,6 +544,34 @@ pub fn create_public_key() -> RistrettoPublicKey {
     address
 }
 
+#[derive(Clone, Default)]
+pub struct MockAssetProxy {}
+
+#[async_trait]
+impl AssetProxy for MockAssetProxy {
+    async fn invoke_method(
+        &self,
+        contract_id: &FixedHash,
+        template_id: TemplateId,
+        method: String,
+        args: Vec<u8>,
+        sender: PublicKey,
+    ) -> Result<(), DigitalAssetError> {
+        Ok(())
+    }
+
+    async fn invoke_read_method(
+        &self,
+        contract_id: &FixedHash,
+        template_id: TemplateId,
+        method: String,
+        args: Vec<u8>,
+        sender: PublicKey,
+    ) -> Result<Option<Vec<u8>>, DigitalAssetError> {
+        Ok(None)
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct MockServiceSpecification;
 
@@ -482,18 +584,18 @@ impl ServiceSpecification for MockServiceSpecification {
     type ChainDbBackendAdapter = MockChainDbBackupAdapter;
     type ChainStorageService = MockChainStorageService;
     type CheckpointManager = ConcreteCheckpointManager<Self::WalletClient>;
-    type CommitteeManager = MockCommitteeManager;
+    type CommitteeManager = MockCommitteeManager<Self::Addr>;
     type DbFactory = MockDbFactory;
     type EventsPublisher = MockEventsPublisher<ConsensusWorkerDomainEvent>;
     type GlobalDbAdapter = crate::storage::mocks::global_db::MockGlobalDbBackupAdapter;
     type InboundConnectionService = MockInboundConnectionService<Self::Addr, Self::Payload>;
     type MempoolService = MockMempoolService;
-    type OutboundService = MockOutboundService<Self::Addr, Self::Payload>;
+    type OutboundService = MockOutboundConnectionService<Self::Addr, Self::Payload>;
     type Payload = TariDanPayload;
     type PayloadProcessor = MockPayloadProcessor;
     type PayloadProvider = MockStaticPayloadProvider<Self::Payload>;
     type SigningService = MockSigningService<Self::Addr>;
     type StateDbBackendAdapter = MockStateDbBackupAdapter;
-    type ValidatorNodeClientFactory = MockValidatorNodeClientFactory;
+    type ValidatorNodeClientFactory = MockValidatorNodeClientFactory<Self::Addr>;
     type WalletClient = MockWalletClient;
 }

@@ -21,9 +21,15 @@
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod consensus_worker;
+#[cfg(test)]
+mod consensus_worker_builder;
 pub mod states;
+#[cfg(test)]
+mod tests;
 
 pub use consensus_worker::ConsensusWorker;
+#[cfg(test)]
+pub use consensus_worker_builder::ConsensusWorkerBuilder;
 
 mod state_sync;
 pub use state_sync::StateSyncError;

@@ -70,6 +70,7 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
         signing_service: &TSpecification::SigningService,
         unit_of_work: TUnitOfWork,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
+        todo!();
         self.received_prepare_messages.clear();
         let mut unit_of_work = unit_of_work;
         let timeout = sleep(timeout);
@@ -116,6 +117,7 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
             return Ok(None);
         }
 
+        todo!("Check that message comes from local committee only");
         if self.received_prepare_messages.contains_key(sender) {
             return Ok(None);
         }
@@ -130,6 +132,7 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
                 self.committee.len()
             );
 
+            todo!("Create merged qc, one qc per shard, and send to all committees for the shards");
             if let Some(qc) = self.create_qc(current_view) {
                 self.broadcast(outbound, &self.committee, qc, current_view.view_id)
                     .await?;

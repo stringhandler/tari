@@ -60,30 +60,31 @@ impl<TSpecification: ServiceSpecification> Starting<TSpecification> {
             target: LOG_TARGET,
             "Checking base layer to see if we are part of the committee"
         );
-        let tip = base_node_client.get_tip_info().await?;
-        // get latest checkpoint on the base layer
-        let mut constitution = base_node_client
-            .get_current_contract_outputs(
-                tip.height_of_longest_chain - asset_definition.base_layer_confirmation_time,
-                asset_definition.contract_id,
-                OutputType::ContractConstitution,
-            )
-            .await?;
-
-        let output = match constitution.pop() {
-            Some(chk) => chk,
-            None => return Ok(ConsensusWorkerStateEvent::BaseLayerCheckopintNotFound),
-        };
-
-        committee_manager.read_from_constitution(output)?;
-
-        if !committee_manager.current_committee()?.contains(node_id) {
-            info!(
-                target: LOG_TARGET,
-                "Validator node not part of committee for asset public key '{}'", asset_definition.contract_id
-            );
-            return Ok(ConsensusWorkerStateEvent::NotPartOfCommittee);
-        }
+        // let tip = base_node_client.get_tip_info().await?;
+        // // get latest checkpoint on the base layer
+        // let mut constitution = base_node_client
+        //     .get_current_contract_outputs(
+        //         tip.height_of_longest_chain
+        //             .saturating_sub(asset_definition.base_layer_confirmation_time),
+        //         asset_definition.contract_id,
+        //         OutputType::ContractConstitution,
+        //     )
+        //     .await?;
+        //
+        // let output = match constitution.pop() {
+        //     Some(chk) => chk,
+        //     None => return Ok(ConsensusWorkerStateEvent::BaseLayerCheckpointNotFound),
+        // };
+        //
+        // committee_manager.read_from_constitution(output)?;
+        //
+        // if !committee_manager.current_committee()?.contains(node_id) {
+        //     info!(
+        //         target: LOG_TARGET,
+        //         "Validator node not part of committee for asset public key '{}'", asset_definition.contract_id
+        //     );
+        //     return Ok(ConsensusWorkerStateEvent::NotPartOfCommittee);
+        // }
 
         info!(
             target: LOG_TARGET,

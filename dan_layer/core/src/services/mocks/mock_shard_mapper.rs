@@ -1,4 +1,4 @@
-//  Copyright 2021. The Tari Project
+//  Copyright 2022. The Tari Project
 //
 //  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 //  following conditions are met:
@@ -20,45 +20,43 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use tari_common_types::types::PublicKey;
+use std::collections::HashMap;
 
-use crate::{
-    digital_assets_error::DigitalAssetError,
-    models::{shard::Shard, BaseLayerOutput, Committee},
-    services::infrastructure_services::NodeAddressable,
-};
+use crate::services::infrastructure_services::NodeAddressable;
 
-pub trait CommitteeManager<TAddr: NodeAddressable> {
-    fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError>;
-
-    fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError>;
-
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<TAddr>, DigitalAssetError>;
+#[derive(Clone, Debug)]
+pub struct MockShardMapper<TAddr: NodeAddressable> {
+    shard_allocation: HashMap<u64, Vec<TAddr>>,
 }
 
-pub struct ConcreteCommitteeManager {
-    committee: Committee<PublicKey>,
-}
-
-impl ConcreteCommitteeManager {
-    pub fn new(committee: Committee<PublicKey>) -> Self {
-        Self { committee }
-    }
-}
-
-impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
-    fn current_committee(&self) -> Result<&Committee<PublicKey>, DigitalAssetError> {
-        Ok(&self.committee)
+impl<TAddr: NodeAddressable> MockShardMapper<TAddr> {
+    pub fn new() -> Self {
+        Self {
+            shard_allocation: HashMap::new(),
+        }
     }
 
-    fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError> {
-        // TODO: better error
-        let committee = output.get_side_chain_committee().unwrap();
-        self.committee = Committee::new(committee.to_vec());
-        Ok(())
+    pub fn assign(&mut self, shard: u64, node: TAddr) {
+        self.shard_allocation.entry(shard).or_insert(vec![]).push(node);
     }
 
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<PublicKey>, DigitalAssetError> {
-        todo!()
+    pub fn get_shards(&self) -> Vec<Vec<TAddr>> {
+        let mut result = vec![];
+        let mut keys: Vec<&u64> = self.shard_allocation.keys().collect();
+        keys.sort();
+        for s in keys {
+            result.push(self.shard_allocation.get(s).unwrap().clone());
+        }
+
+        result
+    }
+
+    pub fn find_shard_for(&self, node: &TAddr) -> Option<u64> {
+        for (shard, nodes) in self.shard_allocation.iter() {
+            if nodes.contains(node) {
+                return Some(*shard);
+            }
+        }
+        None
     }
 }

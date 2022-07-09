@@ -24,8 +24,18 @@ use std::fmt::Debug;
 
 use crate::models::ConsensusHash;
 
-pub trait Payload: Debug + Clone + Send + Sync + ConsensusHash {}
+pub trait Payload: Debug + Clone + Send + Sync + ConsensusHash {
+    fn empty() -> Self;
+}
 
-impl Payload for &str {}
+impl Payload for &str {
+    fn empty() -> Self {
+        ""
+    }
+}
 
-impl Payload for String {}
+impl Payload for String {
+    fn empty() -> Self {
+        "".into()
+    }
+}

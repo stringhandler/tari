@@ -23,7 +23,10 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::{
+    mpsc::{channel, Receiver, Sender},
+    RwLock,
+};
 
 use crate::{
     digital_assets_error::DigitalAssetError,
@@ -31,9 +34,11 @@ use crate::{
     services::infrastructure_services::{InboundConnectionService, NodeAddressable, OutboundService},
 };
 
-pub fn mock_inbound<TAddr: NodeAddressable, TPayload: Payload>() -> MockInboundConnectionService<TAddr, TPayload> {
-    MockInboundConnectionService::default()
-}
+pub mod mock_network;
+
+// pub fn mock_inbound<TAddr: NodeAddressable, TPayload: Payload>() -> MockInboundConnectionService<TAddr, TPayload> {
+//     MockInboundConnectionService::default()
+// }
 
 type Messages<TAddr, TPayload> = (
     Sender<(TAddr, HotStuffMessage<TPayload>)>,
@@ -42,7 +47,10 @@ type Messages<TAddr, TPayload> = (
 
 #[derive()]
 pub struct MockInboundConnectionService<TAddr: NodeAddressable, TPayload: Payload> {
-    messages: Messages<TAddr, TPayload>,
+    pub local_node_address: TAddr,
+    pub network: MockNetworkHandle<TAddr, TPayload>, /* messages: Messages<TAddr, TPayload>,
+                                                      * already_received_messages: Vec<(TAddr,
+                                                      * HotStuffMessage<TPayload>)>, */
 }
 
 #[async_trait]
@@ -54,10 +62,12 @@ impl<TAddr: NodeAddressable + Send, TPayload: Payload> InboundConnectionService
 
     async fn wait_for_message(
         &self,
-        _message_type: HotStuffMessageType,
-        _for_view: ViewId,
+        message_type: HotStuffMessageType,
+        for_view: ViewId,
     ) -> Result<(TAddr, HotStuffMessage<TPayload>), DigitalAssetError> {
-        todo!()
+        self.network
+            .wait_for_message(&self.local_node_address, message_type, for_view)
+            .await
     }
 
     async fn wait_for_qc(
@@ -68,68 +78,28 @@ impl<TAddr: NodeAddressable + Send, TPayload: Payload> InboundConnectionService
         todo!()
     }
 }
-impl<TAddr: NodeAddressable, TPayload: Payload> Default for MockInboundConnectionService<TAddr, TPayload> {
-    fn default() -> Self {
-        Self { messages: channel(10) }
+
+#[derive(Clone)]
+pub struct MockOutboundConnectionService<TAddr: NodeAddressable, TPayload: Payload> {
+    network: MockNetworkHandle<TAddr, TPayload>,
+}
+
+impl<TAddr: NodeAddressable, TPayload: Payload> MockOutboundConnectionService<TAddr, TPayload> {
+    pub fn new(network: MockNetworkHandle<TAddr, TPayload>) -> Self {
+        Self { network }
     }
 }
 
-impl<TAddr: NodeAddressable, TPayload: Payload> MockInboundConnectionService<TAddr, TPayload> {
-    pub fn _push(&mut self, from: TAddr, message: HotStuffMessage<TPayload>) {
-        self.messages.0.try_send((from, message)).unwrap()
-    }
+use std::{fmt::Debug, sync::Arc};
 
-    pub fn _create_sender(&self) -> Sender<(TAddr, HotStuffMessage<TPayload>)> {
-        self.messages.0.clone()
-    }
-}
-
-pub fn mock_outbound<TAddr: NodeAddressable, TPayload: Payload>(
-    committee: Vec<TAddr>,
-) -> MockOutboundService<TAddr, TPayload> {
-    MockOutboundService::new(committee)
-}
-
-pub struct MockOutboundService<TAddr: NodeAddressable, TPayload: Payload> {
-    inbound_senders: HashMap<TAddr, Sender<(TAddr, HotStuffMessage<TPayload>)>>,
-    inbounds: HashMap<TAddr, MockInboundConnectionService<TAddr, TPayload>>,
-}
-
-impl<TAddr: NodeAddressable, TPayload: Payload> Clone for MockOutboundService<TAddr, TPayload> {
-    fn clone(&self) -> Self {
-        MockOutboundService {
-            inbound_senders: self.inbound_senders.clone(),
-            inbounds: HashMap::new(),
-        }
-    }
-}
-impl<TAddr: NodeAddressable, TPayload: Payload> MockOutboundService<TAddr, TPayload> {
-    pub fn new(committee: Vec<TAddr>) -> Self {
-        let mut inbounds = HashMap::new();
-        let mut inbound_senders = HashMap::new();
-        for member in committee {
-            let inbound = mock_inbound();
-            inbound_senders.insert(member.clone(), inbound.messages.0.clone());
-            inbounds.insert(member.clone(), inbound);
-        }
-        Self {
-            inbounds,
-            inbound_senders,
-        }
-    }
-
-    pub fn take_inbound(&mut self, member: &TAddr) -> Option<MockInboundConnectionService<TAddr, TPayload>> {
-        self.inbounds.remove(member)
-    }
-}
-
-use std::fmt::Debug;
-
-use crate::models::{HotStuffMessageType, Payload, ViewId};
+use crate::{
+    models::{HotStuffMessageType, Payload, ViewId},
+    services::infrastructure_services::mocks::mock_network::MockNetworkHandle,
+};
 
 #[async_trait]
 impl<TAddr: NodeAddressable + Send + Sync + Debug, TPayload: Payload> OutboundService
-    for MockOutboundService<TAddr, TPayload>
+    for MockOutboundConnectionService<TAddr, TPayload>
 {
     type Addr = TAddr;
     type Payload = TPayload;
@@ -148,18 +118,18 @@ impl<TAddr: NodeAddressable + Send + Sync + Debug, TPayload: Payload> OutboundSe
             &message.partial_sig()
         );
         // intentionally swallow error here because the other end can die in tests
-        let _result = self.inbound_senders.get_mut(t).unwrap().send((from, message)).await;
+        // let _result = self.inbound_senders.get_mut(t).unwrap().send((from, message)).await;
+        self.network.send(from, to, message).await?;
         Ok(())
     }
 
     async fn broadcast(
         &mut self,
         from: TAddr,
-        _committee: &[TAddr],
+        committee: &[TAddr],
         message: HotStuffMessage<TPayload>,
     ) -> Result<(), DigitalAssetError> {
-        let receivers: Vec<TAddr> = self.inbound_senders.keys().cloned().collect();
-        for receiver in receivers {
+        for receiver in committee {
             self.send(from.clone(), receiver.clone(), message.clone()).await?
         }
         Ok(())

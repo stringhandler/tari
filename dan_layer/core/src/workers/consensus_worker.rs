@@ -28,7 +28,7 @@ use std::sync::{
 use log::*;
 use tari_common_types::types::PublicKey;
 use tari_dan_engine::state::{StateDbUnitOfWork, StateDbUnitOfWorkImpl, StateDbUnitOfWorkReader};
-use tari_shutdown::ShutdownSignal;
+use tari_shutdown::{Shutdown, ShutdownSignal};
 use tokio::time::Duration;
 
 use crate::{
@@ -65,7 +65,7 @@ pub struct ConsensusWorker<TSpecification: ServiceSpecification> {
     validator_node_client_factory: TSpecification::ValidatorNodeClientFactory,
 }
 
-impl<TSpecification: ServiceSpecification<Addr = PublicKey>> ConsensusWorker<TSpecification> {
+impl<TSpecification: ServiceSpecification> ConsensusWorker<TSpecification> {
     pub fn new(
         inbound_connections: TSpecification::InboundConnectionService,
         outbound_service: TSpecification::OutboundService,
@@ -116,6 +116,18 @@ impl<TSpecification: ServiceSpecification<Addr = PublicKey>> ConsensusWorker<TSp
         })
     }
 
+    pub fn payload_provider_mut(&mut self) -> &mut TSpecification::PayloadProvider {
+        &mut self.payload_provider
+    }
+
+    /// Run on full view. Mainly used for debugging
+    pub async fn step(&mut self) -> Result<(), DigitalAssetError> {
+        let shutdown = Shutdown::new();
+        let stop = AtomicBool::new(false);
+
+        self.run(shutdown.to_signal(), Some(1), Arc::new(stop)).await
+    }
+
     pub async fn run(
         &mut self,
         shutdown: ShutdownSignal,
@@ -133,6 +145,7 @@ impl<TSpecification: ServiceSpecification<Addr = PublicKey>> ConsensusWorker<TSp
             target: LOG_TARGET,
             "Consensus worker started for asset '{}'. Tip: {}", self.asset_definition.contract_id, self.current_view_id
         );
+        dbg!("start");
         let starting_view = self.current_view_id;
         while !stop.load(Ordering::Relaxed) {
             if let Some(max) = max_views_to_process {
@@ -174,8 +187,9 @@ struct ConsensusWorkerProcessor<'a, T: ServiceSpecification> {
     shutdown: &'a ShutdownSignal,
 }
 
-impl<'a, T: ServiceSpecification<Addr = PublicKey>> ConsensusWorkerProcessor<'a, T> {
+impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
     async fn next_state_event(&mut self) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
+        dbg!("next_state_event");
         use ConsensusWorkerState::{Commit, Decide, Idle, NextView, PreCommit, Prepare, Starting, Synchronizing};
         match &mut self.worker.state {
             Starting => self.starting().await,
@@ -232,6 +246,7 @@ impl<'a, T: ServiceSpecification<Addr = PublicKey>> ConsensusWorkerProcessor<'a,
                 self.worker.timeout,
                 &self.worker.asset_definition,
                 self.worker.committee_manager.current_committee()?,
+                &self.worker.committee_manager,
                 &self.worker.inbound_connections,
                 &mut self.worker.outbound_service,
                 &mut self.worker.payload_provider,
@@ -356,7 +371,7 @@ impl<'a, T: ServiceSpecification<Addr = PublicKey>> ConsensusWorkerProcessor<'a,
     }
 }
 
-impl<TSpecification: ServiceSpecification<Addr = PublicKey>> ConsensusWorker<TSpecification> {
+impl<TSpecification: ServiceSpecification> ConsensusWorker<TSpecification> {
     fn transition(
         &mut self,
         event: ConsensusWorkerStateEvent,
@@ -413,7 +428,11 @@ mod test {
             TariDanPayload,
         },
         services::{
-            infrastructure_services::mocks::{mock_outbound, MockInboundConnectionService, MockOutboundService},
+            infrastructure_services::mocks::{
+                mock_network::MockNetworkHandle,
+                MockInboundConnectionService,
+                MockOutboundConnectionService,
+            },
             mocks::{
                 create_public_key,
                 mock_base_node_client,
@@ -434,8 +453,8 @@ mod test {
 
     fn start_replica(
         inbound: MockInboundConnectionService<RistrettoPublicKey, TariDanPayload>,
-        outbound: MockOutboundService<RistrettoPublicKey, TariDanPayload>,
-        committee_manager: MockCommitteeManager,
+        outbound: MockOutboundConnectionService<RistrettoPublicKey, TariDanPayload>,
+        committee_manager: MockCommitteeManager<RistrettoPublicKey>,
         node_id: RistrettoPublicKey,
         shutdown_signal: ShutdownSignal,
         events_publisher: MockEventsPublisher<ConsensusWorkerDomainEvent>,
@@ -477,79 +496,82 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_simple_case() {
-        let mut shutdown = Shutdown::new();
-        let signal = shutdown.to_signal();
-
-        let address_a = create_public_key();
-        let address_b = create_public_key();
-
-        let committee = Committee::new(vec![address_a.clone(), address_b.clone()]);
-        let mut outbound = mock_outbound(committee.members.clone());
-        let committee_manager = MockCommitteeManager { committee };
-
-        let inbound_a = outbound.take_inbound(&address_a.clone()).unwrap();
-        let inbound_b = outbound.take_inbound(&address_b.clone()).unwrap();
-        // let inbound_c = outbound.take_inbound(&"C").unwrap();
-        // let inbound_d = outbound.take_inbound(&"D").unwrap();
-
-        let events = [
-            mock_events_publisher(),
-            mock_events_publisher(),
-            mock_events_publisher(),
-            mock_events_publisher(),
-        ];
-
-        let task_a = start_replica(
-            inbound_a,
-            outbound.clone(),
-            committee_manager.clone(),
-            address_a,
-            signal.clone(),
-            events[0].clone(),
-        );
-        let task_b = start_replica(
-            inbound_b,
-            outbound.clone(),
-            committee_manager,
-            address_b,
-            signal.clone(),
-            events[1].clone(),
-        );
-        // let task_c = start_replica(
-        //     inbound_c,
+        todo!()
+        // let mut shutdown = Shutdown::new();
+        // let signal = shutdown.to_signal();
+        //
+        // let address_a = create_public_key();
+        // let address_b = create_public_key();
+        //
+        // let network = MockNetworkHandle::new();
+        //
+        // let committee = Committee::new(vec![address_a.clone(), address_b.clone()]);
+        // let mut outbound = network.create_outbound();
+        // let committee_manager = MockCommitteeManager { committee };
+        //
+        // let inbound_a = network.create_inbound(address_a.clone());
+        // let inbound_b = network.create_inbound(address_b.clone());
+        // // let inbound_c = outbound.take_inbound(&"C").unwrap();
+        // // let inbound_d = outbound.take_inbound(&"D").unwrap();
+        //
+        // let events = [
+        //     mock_events_publisher(),
+        //     mock_events_publisher(),
+        //     mock_events_publisher(),
+        //     mock_events_publisher(),
+        // ];
+        //
+        // let task_a = start_replica(
+        //     inbound_a,
         //     outbound.clone(),
-        //     committee.clone(),
-        //     "C",
+        //     committee_manager.clone(),
+        //     address_a,
         //     signal.clone(),
-        //     events[2].clone(),
+        //     events[0].clone(),
         // );
-        // let task_d = start_replica(
-        //     inbound_d,
+        // let task_b = start_replica(
+        //     inbound_b,
         //     outbound.clone(),
-        //     committee.clone(),
-        //     "D",
+        //     committee_manager,
+        //     address_b,
         //     signal.clone(),
-        //     events[3].clone(),
+        //     events[1].clone(),
         // );
-        shutdown.trigger();
-        task_a.await.unwrap();
-        task_b.await.unwrap();
-        // task_c.await.unwrap();
-        // task_d.await.unwrap();
-
-        // assert_eq!(events[0].to_vec(), vec![ConsensusWorkerDomainEvent::StateChanged {
-        //     old: Starting,
-        // new: Prepare
-        // }]);
-
-        assert_state_change(&events[0].to_vec(), vec![
-            Prepare, NextView, Prepare, PreCommit, Commit, Decide, NextView, Prepare, PreCommit, Commit, Decide,
-            NextView,
-        ]);
-        assert_state_change(&events[1].to_vec(), vec![
-            Prepare, NextView, Prepare, PreCommit, Commit, Decide, NextView, Prepare, PreCommit, Commit, Decide,
-            NextView,
-        ]);
+        // // let task_c = start_replica(
+        // //     inbound_c,
+        // //     outbound.clone(),
+        // //     committee.clone(),
+        // //     "C",
+        // //     signal.clone(),
+        // //     events[2].clone(),
+        // // );
+        // // let task_d = start_replica(
+        // //     inbound_d,
+        // //     outbound.clone(),
+        // //     committee.clone(),
+        // //     "D",
+        // //     signal.clone(),
+        // //     events[3].clone(),
+        // // );
+        // shutdown.trigger();
+        // task_a.await.unwrap();
+        // task_b.await.unwrap();
+        // // task_c.await.unwrap();
+        // // task_d.await.unwrap();
+        //
+        // // assert_eq!(events[0].to_vec(), vec![ConsensusWorkerDomainEvent::StateChanged {
+        // //     old: Starting,
+        // // new: Prepare
+        // // }]);
+        //
+        // assert_state_change(&events[0].to_vec(), vec![
+        //     Prepare, NextView, Prepare, PreCommit, Commit, Decide, NextView, Prepare, PreCommit, Commit, Decide,
+        //     NextView,
+        // ]);
+        // assert_state_change(&events[1].to_vec(), vec![
+        //     Prepare, NextView, Prepare, PreCommit, Commit, Decide, NextView, Prepare, PreCommit, Commit, Decide,
+        //     NextView,
+        // ]);
     }
 
     fn assert_state_change(events: &[ConsensusWorkerDomainEvent], states: Vec<ConsensusWorkerState>) {
@@ -560,5 +582,11 @@ mod test {
         for (state, event) in states.iter().zip(mapped_events) {
             assert_eq!(state, event.unwrap())
         }
+    }
+
+    #[test]
+    fn test_not_enough_new_view_to_start() {
+        // Test what happens when the leader does not receive enough new view messages in Prepare state
+        todo!()
     }
 }

@@ -35,6 +35,7 @@ mod instruction_set;
 mod node;
 mod payload;
 mod quorum_certificate;
+pub mod shard;
 mod sidechain_block;
 mod sidechain_metadata;
 mod tari_dan_payload;

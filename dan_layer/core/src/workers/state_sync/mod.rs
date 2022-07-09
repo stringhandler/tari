@@ -53,7 +53,7 @@ impl<'a, TStateDbBackendAdapter, TValidatorNodeClientFactory>
     StateSynchronizer<'a, TStateDbBackendAdapter, TValidatorNodeClientFactory>
 where
     TStateDbBackendAdapter: StateDbBackendAdapter,
-    TValidatorNodeClientFactory: ValidatorNodeClientFactory<Addr = PublicKey>,
+    TValidatorNodeClientFactory: ValidatorNodeClientFactory,
 {
     pub fn new(
         last_checkpoint: &'a CheckpointOutput,
