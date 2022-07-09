@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 use digest::Digest;
 use tari_common_types::types::{FixedHash, PublicKey};
 use tari_crypto::common::Blake256;
-use tari_dan_common_types::TemplateId;
+use tari_dan_common_types::{ShardKey, TemplateId};
 use tari_utilities::hex::Hex;
 
 #[derive(Clone, Debug)]
@@ -18,6 +18,7 @@ pub struct Instruction {
     // from: TokenId,
     // signature: ComSig,
     hash: FixedHash,
+    involved_shards: Vec<ShardKey>,
 }
 
 impl PartialEq for Instruction {
@@ -44,6 +45,7 @@ impl Instruction {
             // TODO: this is obviously wrong
             // signature: ComSig::default(),
             hash: FixedHash::zero(),
+            involved_shards: todo!(),
         };
         s.hash = s.calculate_hash();
         s
@@ -63,6 +65,10 @@ impl Instruction {
 
     pub fn sender(&self) -> PublicKey {
         self.sender.clone()
+    }
+
+    pub fn involved_shard_keys(&self) -> &[ShardKey] {
+        &self.involved_shards
     }
 
     // // TODO: rename to avoid use of from

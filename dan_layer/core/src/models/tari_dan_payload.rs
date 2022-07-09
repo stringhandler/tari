@@ -25,6 +25,7 @@ use std::fmt::Debug;
 use digest::Digest;
 use tari_common_types::types::FixedHash;
 use tari_crypto::common::Blake256;
+use tari_dan_common_types::ShardKey;
 use tari_dan_engine::instructions::Instruction;
 
 use crate::models::{ConsensusHash, InstructionSet, Payload};
@@ -34,14 +35,16 @@ pub struct TariDanPayload {
     hash: FixedHash,
     instruction_set: InstructionSet,
     checkpoint: Option<CheckpointData>,
+    involved_shards: Vec<ShardKey>,
 }
 
 impl TariDanPayload {
     pub fn new(instruction_set: InstructionSet, checkpoint: Option<CheckpointData>) -> Self {
         let mut result = Self {
             hash: FixedHash::zero(),
-            instruction_set,
             checkpoint,
+            involved_shards: instruction_set.involved_shard_keys(),
+            instruction_set,
         };
         result.hash = result.calculate_hash();
         result
@@ -74,6 +77,10 @@ impl ConsensusHash for TariDanPayload {
 impl Payload for TariDanPayload {
     fn empty() -> Self {
         TariDanPayload::new(InstructionSet::empty(), None)
+    }
+
+    fn involved_shard_keys(&self) -> Vec<ShardKey> {
+        todo!()
     }
 }
 

@@ -73,18 +73,20 @@ impl<TAddr: NodeAddressable, TPayload: Payload> MockNetworkHandle<TAddr, TPayloa
         for_view: ViewId,
     ) -> Result<(TAddr, HotStuffMessage<TPayload>), DigitalAssetError> {
         loop {
+            dbg!("Waiting for message");
+
             let mut message = None;
             {
                 let mut guard = self.inner.write().unwrap();
+                dbg!(guard.all_messages.len());
                 message = guard.take_message(to, message_type, for_view)?;
             }
-            todo!();
-
             if let Some(message) = message {
                 return Ok((message.from, message.message));
             } else {
                 // Wait for new messages, then try again...
                 self.new_message_event.subscribe().recv().await.unwrap();
+                todo!();
             }
         }
     }

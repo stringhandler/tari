@@ -35,6 +35,7 @@ use crate::{
         HotStuffMessage,
         HotStuffMessageType,
         HotStuffTreeNode,
+        Payload,
         QuorumCertificate,
         TreeNodeHash,
         View,
@@ -109,6 +110,8 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                 r = inbound_services.wait_for_message(HotStuffMessageType::NewView, current_view.view_id())  => {
                     let (from, message) = r?;
                     debug!(target: LOG_TARGET, "Received leader message (is_leader = {:?})", current_view.is_leader());
+                    dbg!(&from);
+                    dbg!(&message);
                     if current_view.is_leader() {
                         if let Some(event) = self.process_leader_message(
                             current_view,
@@ -147,6 +150,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
 
                 },
                 _ = &mut timeout => {
+                    todo!();
                     break Ok( ConsensusWorkerStateEvent::TimedOut);
                 }
             }
@@ -203,8 +207,10 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                     temp_state_tx,
                 )
                 .await?;
-            let shards = proposal.involved_shards();
-            let total_committee_set = committee_manager.get_node_set_for_shards(shards)?;
+            let shard_keys = proposal.payload().involved_shard_keys();
+            dbg!(&shard_keys);
+            let total_committee_set = committee_manager.get_node_set_for_shards(&shard_keys)?;
+            dbg!(&total_committee_set);
             self.broadcast_proposal(outbound, &total_committee_set, proposal, high_qc, current_view.view_id)
                 .await?;
             Ok(None) // Will move to pre-commit when it receives the message as a replica

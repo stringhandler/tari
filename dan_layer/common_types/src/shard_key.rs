@@ -1,4 +1,4 @@
-//  Copyright 2021. The Tari Project
+//  Copyright 2022. The Tari Project
 //
 //  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
 //  following conditions are met:
@@ -20,33 +20,15 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::fmt::Debug;
-
-use tari_dan_common_types::ShardKey;
-
-use crate::models::ConsensusHash;
-
-pub trait Payload: Debug + Clone + Send + Sync + ConsensusHash {
-    fn empty() -> Self;
-    fn involved_shard_keys(&self) -> Vec<ShardKey>;
-}
-
-impl Payload for &str {
-    fn empty() -> Self {
-        ""
+// TODO: Remove pub for inner vec
+#[derive(Debug, Clone)]
+pub struct ShardKey(pub Vec<u8>);
+impl ShardKey {
+    pub fn new(key: Vec<u8>) -> Self {
+        ShardKey(key)
     }
 
-    fn involved_shard_keys(&self) -> Vec<ShardKey> {
-        vec![ShardKey::new(self.as_bytes().to_vec())]
-    }
-}
-
-impl Payload for String {
-    fn empty() -> Self {
-        "".into()
-    }
-
-    fn involved_shard_keys(&self) -> Vec<ShardKey> {
-        vec![ShardKey::new(self.as_bytes().to_vec())]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
     }
 }

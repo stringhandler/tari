@@ -20,30 +20,34 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
+
+use tari_dan_common_types::{Shard, ShardKey};
 
 use crate::services::infrastructure_services::NodeAddressable;
 
 #[derive(Clone, Debug)]
 pub struct MockShardMapper<TAddr: NodeAddressable> {
-    shard_allocation: HashMap<u64, Vec<TAddr>>,
+    shard_allocation: HashMap<Shard, Vec<TAddr>>,
+    shard_map: Vec<(Range<u8>, Shard)>,
 }
 
 impl<TAddr: NodeAddressable> MockShardMapper<TAddr> {
     pub fn new() -> Self {
         Self {
             shard_allocation: HashMap::new(),
+            shard_map: vec![],
         }
     }
 
-    pub fn assign(&mut self, shard: u64, node: TAddr) {
-        self.shard_allocation.entry(shard).or_insert(vec![]).push(node);
+    pub fn assign(&mut self, shard: Shard, range: Range<u8>, node: TAddr) {
+        self.shard_allocation.entry(shard.clone()).or_insert(vec![]).push(node);
+        self.shard_map.push((range, shard));
     }
 
     pub fn get_shards(&self) -> Vec<Vec<TAddr>> {
         let mut result = vec![];
-        let mut keys: Vec<&u64> = self.shard_allocation.keys().collect();
-        keys.sort();
+        let mut keys: Vec<&Shard> = self.shard_allocation.keys().collect();
         for s in keys {
             result.push(self.shard_allocation.get(s).unwrap().clone());
         }
@@ -51,10 +55,23 @@ impl<TAddr: NodeAddressable> MockShardMapper<TAddr> {
         result
     }
 
-    pub fn find_shard_for(&self, node: &TAddr) -> Option<u64> {
+    pub fn get_nodes_for_shard(&self, shard: &Shard) -> Option<Vec<TAddr>> {
+        self.shard_allocation.get(shard).map(|v| v.clone())
+    }
+
+    pub fn find_shard_for(&self, node: &TAddr) -> Option<Shard> {
         for (shard, nodes) in self.shard_allocation.iter() {
             if nodes.contains(node) {
-                return Some(*shard);
+                return Some(shard.clone());
+            }
+        }
+        None
+    }
+
+    pub fn get_shard_for_key(&self, key: &ShardKey) -> Option<Shard> {
+        for (range, shard) in self.shard_map.iter() {
+            if range.contains(&key.0[0]) {
+                return Some(shard.clone());
             }
         }
         None

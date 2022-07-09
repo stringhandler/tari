@@ -23,7 +23,7 @@
 pub mod mock_shard_mapper;
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
@@ -35,7 +35,7 @@ use tari_core::{
     transactions::transaction_components::{OutputType, SignerSignature},
 };
 use tari_crypto::ristretto::RistrettoPublicKey;
-use tari_dan_common_types::TemplateId;
+use tari_dan_common_types::{Shard, ShardKey, TemplateId};
 #[cfg(test)]
 use tari_dan_engine::state::mocks::state_db::MockStateDbBackupAdapter;
 use tari_dan_engine::{
@@ -50,7 +50,6 @@ use tari_dan_engine::{
 use crate::{
     digital_assets_error::DigitalAssetError,
     models::{
-        shard::Shard,
         AssetDefinition,
         BaseLayerMetadata,
         BaseLayerOutput,
@@ -69,6 +68,7 @@ use crate::{
     services::{
         base_node_client::BaseNodeClient,
         infrastructure_services::NodeAddressable,
+        mocks::mock_shard_mapper::MockShardMapper,
         AssetProcessor,
         AssetProxy,
         CommitteeManager,
@@ -316,39 +316,49 @@ pub fn mock_base_node_client() -> MockBaseNodeClient {
 }
 
 pub fn mock_committee_manager<TAddr: NodeAddressable>(
-    committees: Vec<Vec<TAddr>>,
-    in_shard: u64,
+    shard_mapper: MockShardMapper<TAddr>,
+    in_shard: Shard,
 ) -> MockCommitteeManager<TAddr> {
-    let mut hs = HashMap::new();
-    for (i, committee) in committees.into_iter().enumerate() {
-        hs.insert(Shard { id: i as u64 }, Committee::new(committee));
-    }
+    let current_committee = Committee::new(
+        shard_mapper
+            .get_nodes_for_shard(&in_shard)
+            .expect("Failed to get nodes for shard"),
+    );
     MockCommitteeManager {
-        committees: hs,
-        in_shard: Shard { id: in_shard },
+        shard_mapper,
+        in_shard,
+        current_committee,
     }
 }
 #[derive(Clone)]
 pub struct MockCommitteeManager<TAddr: NodeAddressable> {
-    pub committees: HashMap<Shard, Committee<TAddr>>,
+    pub current_committee: Committee<TAddr>,
+    pub shard_mapper: MockShardMapper<TAddr>,
     pub in_shard: Shard,
 }
 
 impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TAddr> {
     fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError> {
-        Ok(&self.committees[&self.in_shard])
+        Ok(&self.current_committee)
     }
 
     fn read_from_constitution(&mut self, _output: BaseLayerOutput) -> Result<(), DigitalAssetError> {
         todo!();
     }
 
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<TAddr>, DigitalAssetError> {
-        let mut nodes = vec![];
-        for shard in shards {
-            nodes.extend(self.committees[shard].members.iter().cloned());
+    fn get_node_set_for_shards(&self, shard_keys: &[ShardKey]) -> Result<Vec<TAddr>, DigitalAssetError> {
+        let mut shards = HashSet::new();
+        for shard_key in shard_keys {
+            let shard = self.shard_mapper.get_shard_for_key(shard_key).expect("No shard found");
+            shards.insert(shard);
         }
-        Ok(nodes)
+        let mut nodes = HashSet::new();
+        for shard in shards {
+            nodes.extend(self.shard_mapper.get_nodes_for_shard(&shard).expect("No nodes found"));
+        }
+        // Always include itself
+        nodes.extend(self.current_committee().unwrap().members.clone());
+        Ok(nodes.into_iter().collect())
     }
 }
 

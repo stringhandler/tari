@@ -24,6 +24,7 @@ use std::{convert::TryFrom, hash::Hash, iter::FromIterator};
 
 use tari_common_types::types::FixedHash;
 use tari_crypto::common::Blake256;
+use tari_dan_common_types::ShardKey;
 use tari_dan_engine::instructions::Instruction;
 use tari_mmr::MerkleMountainRange;
 
@@ -61,6 +62,13 @@ pub struct InstructionSet {
 impl InstructionSet {
     pub fn empty() -> Self {
         Self::from_vec(vec![])
+    }
+
+    pub fn involved_shard_keys(&self) -> Vec<ShardKey> {
+        self.instructions
+            .iter()
+            .flat_map(|i| i.involved_shard_keys().iter().cloned())
+            .collect()
     }
 
     pub fn from_vec(instructions: Vec<Instruction>) -> Self {

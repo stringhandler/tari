@@ -21,10 +21,11 @@
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use tari_common_types::types::PublicKey;
+use tari_dan_common_types::ShardKey;
 
 use crate::{
     digital_assets_error::DigitalAssetError,
-    models::{shard::Shard, BaseLayerOutput, Committee},
+    models::{BaseLayerOutput, Committee},
     services::infrastructure_services::NodeAddressable,
 };
 
@@ -33,7 +34,7 @@ pub trait CommitteeManager<TAddr: NodeAddressable> {
 
     fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError>;
 
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<TAddr>, DigitalAssetError>;
+    fn get_node_set_for_shards(&self, shards: &[ShardKey]) -> Result<Vec<TAddr>, DigitalAssetError>;
 }
 
 pub struct ConcreteCommitteeManager {
@@ -58,7 +59,7 @@ impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
         Ok(())
     }
 
-    fn get_node_set_for_shards(&self, shards: &[Shard]) -> Result<Vec<PublicKey>, DigitalAssetError> {
+    fn get_node_set_for_shards(&self, shards: &[ShardKey]) -> Result<Vec<PublicKey>, DigitalAssetError> {
         todo!()
     }
 }

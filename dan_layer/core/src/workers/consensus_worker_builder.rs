@@ -89,7 +89,7 @@ impl ConsensusWorkerBuilder<MockServiceSpecification2> {
         ConsensusWorker::new(
             network.create_inbound(identity.clone()),
             network.create_outbound(),
-            mock_committee_manager(shards, current_shard),
+            mock_committee_manager(shard_mapper, current_shard),
             identity.clone(),
             mock_payload_provider(),
             mock_events_publisher(),
@@ -97,7 +97,7 @@ impl ConsensusWorkerBuilder<MockServiceSpecification2> {
             mock_payload_processor(),
             Default::default(),
             mock_base_node_client(),
-            Duration::from_secs(60),
+            Duration::from_secs(5),
             MockDbFactory::default(),
             MockChainStorageService::default(),
             mock_checkpoint_manager(),
