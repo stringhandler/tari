@@ -35,6 +35,8 @@ pub trait CommitteeManager<TAddr: NodeAddressable> {
     fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError>;
 
     fn get_node_set_for_shards(&self, shards: &[ShardKey]) -> Result<Vec<TAddr>, DigitalAssetError>;
+
+    fn are_shard_keys_in_current(&self, shards: &[ShardKey]) -> Result<bool, DigitalAssetError>;
 }
 
 pub struct ConcreteCommitteeManager {
@@ -60,6 +62,10 @@ impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
     }
 
     fn get_node_set_for_shards(&self, shards: &[ShardKey]) -> Result<Vec<PublicKey>, DigitalAssetError> {
+        todo!()
+    }
+
+    fn are_shard_keys_in_current(&self, shards: &[ShardKey]) -> Result<bool, DigitalAssetError> {
         todo!()
     }
 }

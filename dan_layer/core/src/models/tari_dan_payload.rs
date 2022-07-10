@@ -82,6 +82,10 @@ impl Payload for TariDanPayload {
     fn involved_shard_keys(&self) -> Vec<ShardKey> {
         todo!()
     }
+
+    fn is_empty(&self) -> bool {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, Default)]

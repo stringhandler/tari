@@ -29,6 +29,7 @@ use crate::models::ConsensusHash;
 pub trait Payload: Debug + Clone + Send + Sync + ConsensusHash {
     fn empty() -> Self;
     fn involved_shard_keys(&self) -> Vec<ShardKey>;
+    fn is_empty(&self) -> bool;
 }
 
 impl Payload for &str {
@@ -39,6 +40,10 @@ impl Payload for &str {
     fn involved_shard_keys(&self) -> Vec<ShardKey> {
         vec![ShardKey::new(self.as_bytes().to_vec())]
     }
+
+    fn is_empty(&self) -> bool {
+        self == &Self::empty()
+    }
 }
 
 impl Payload for String {
@@ -48,5 +53,9 @@ impl Payload for String {
 
     fn involved_shard_keys(&self) -> Vec<ShardKey> {
         vec![ShardKey::new(self.as_bytes().to_vec())]
+    }
+
+    fn is_empty(&self) -> bool {
+        self == &Self::empty()
     }
 }

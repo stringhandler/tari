@@ -107,6 +107,7 @@ impl<TAddr: NodeAddressable, TPayload: Payload> MockNetworkHandle<TAddr, TPayloa
     }
 
     pub fn print_all_messages(&self) {
+        dbg!("printing all messages");
         let inner = self.inner.read().unwrap();
         inner.print_all_messages();
     }

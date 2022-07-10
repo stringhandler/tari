@@ -129,6 +129,13 @@ impl Payload for SimplePayload {
             },
         }
     }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            SimplePayload::Empty => true,
+            SimplePayload::StateChange { .. } => false,
+        }
+    }
 }
 const empty_hash: [u8; 32] = [0; 32];
 impl ConsensusHash for SimplePayload {
@@ -209,8 +216,10 @@ pub async fn two_shards() {
     let t2 = tokio::spawn(async move {
         worker_two.step().await.unwrap();
     });
-    join!(t1, t2);
+    let (res, res2) = join!(t1, t2);
     network.print_all_messages();
+    res.expect("t1 failed");
+    res2.expect("t2 failed");
     // mempool.add(tx);
     // workers[0].step();
     // workers[1].step();

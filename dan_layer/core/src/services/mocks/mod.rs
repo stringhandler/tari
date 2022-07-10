@@ -360,6 +360,15 @@ impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TA
         nodes.extend(self.current_committee().unwrap().members.clone());
         Ok(nodes.into_iter().collect())
     }
+
+    fn are_shard_keys_in_current(&self, shard_keys: &[ShardKey]) -> Result<bool, DigitalAssetError> {
+        let mut shards = HashSet::new();
+        for shard_key in shard_keys {
+            let shard = self.shard_mapper.get_shard_for_key(shard_key).expect("No shard found");
+            shards.insert(shard);
+        }
+        Ok(shards.len() == 1 && shards.into_iter().next().unwrap() == self.in_shard)
+    }
 }
 
 // pub fn _mock_template_service() -> MockTemplateService {

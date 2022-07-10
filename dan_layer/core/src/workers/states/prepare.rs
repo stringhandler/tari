@@ -142,6 +142,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                         payload_processor,
                         payload_provider,
                         &mut chain_tx,
+                        committee_manager,
                         chain_storage_service,
                         state_tx,
                     ).await? {
@@ -236,6 +237,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         payload_processor: &mut TSpecification::PayloadProcessor,
         payload_provider: &mut TSpecification::PayloadProvider,
         chain_tx: &mut TChainDbUnitOfWork,
+        committee_manager: &TSpecification::CommitteeManager,
         chain_storage_service: &TSpecification::ChainStorageService,
         state_tx: &mut TStateDbUnitOfWork,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
@@ -271,7 +273,15 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             }
         }
 
-        todo!("Merge all proposals");
+        dbg!(&node.payload().involved_shard_keys());
+        if !node.payload().is_empty() {
+            if committee_manager.are_shard_keys_in_current(&node.payload().involved_shard_keys())? {
+                // single committee consensus
+                // Nothing to do here
+            } else {
+                todo!("Merge all proposals");
+            }
+        }
         debug!(
             target: LOG_TARGET,
             "[PREPARE] Processing prepared payload for view {}",
