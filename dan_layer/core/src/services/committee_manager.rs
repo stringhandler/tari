@@ -20,8 +20,10 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::collections::HashMap;
+
 use tari_common_types::types::PublicKey;
-use tari_dan_common_types::ShardKey;
+use tari_dan_common_types::{Shard, ShardKey};
 
 use crate::{
     digital_assets_error::DigitalAssetError,
@@ -30,6 +32,7 @@ use crate::{
 };
 
 pub trait CommitteeManager<TAddr: NodeAddressable> {
+    fn current_shard(&self) -> Result<Shard, DigitalAssetError>;
     fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError>;
 
     fn read_from_constitution(&mut self, output: BaseLayerOutput) -> Result<(), DigitalAssetError>;
@@ -37,6 +40,11 @@ pub trait CommitteeManager<TAddr: NodeAddressable> {
     fn get_node_set_for_shards(&self, shards: &[ShardKey]) -> Result<Vec<TAddr>, DigitalAssetError>;
 
     fn are_shard_keys_in_current(&self, shards: &[ShardKey]) -> Result<bool, DigitalAssetError>;
+    fn get_shard_committee(&self, shard: Shard) -> Result<Committee<TAddr>, DigitalAssetError>;
+    fn get_shards_for_keys(
+        &self,
+        shard_keys: &[ShardKey],
+    ) -> Result<HashMap<Shard, Committee<TAddr>>, DigitalAssetError>;
 }
 
 pub struct ConcreteCommitteeManager {
@@ -50,6 +58,10 @@ impl ConcreteCommitteeManager {
 }
 
 impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
+    fn current_shard(&self) -> Result<Shard, DigitalAssetError> {
+        todo!()
+    }
+
     fn current_committee(&self) -> Result<&Committee<PublicKey>, DigitalAssetError> {
         Ok(&self.committee)
     }
@@ -66,6 +78,17 @@ impl CommitteeManager<PublicKey> for ConcreteCommitteeManager {
     }
 
     fn are_shard_keys_in_current(&self, shards: &[ShardKey]) -> Result<bool, DigitalAssetError> {
+        todo!()
+    }
+
+    fn get_shard_committee(&self, shard: Shard) -> Result<Committee<PublicKey>, DigitalAssetError> {
+        todo!()
+    }
+
+    fn get_shards_for_keys(
+        &self,
+        shard_keys: &[ShardKey],
+    ) -> Result<HashMap<Shard, Committee<PublicKey>>, DigitalAssetError> {
         todo!()
     }
 }

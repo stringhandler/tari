@@ -25,6 +25,7 @@ use std::collections::HashMap;
 use log::*;
 use tari_common_types::types::FixedHash;
 use tari_core::transactions::transaction_components::SignerSignature;
+use tari_dan_common_types::Shard;
 use tari_utilities::hex::Hex;
 use tokio::time::{sleep, Duration};
 
@@ -33,6 +34,7 @@ use crate::{
     models::{Committee, HotStuffMessage, HotStuffMessageType, QuorumCertificate, View, ViewId},
     services::{
         infrastructure_services::{InboundConnectionService, OutboundService},
+        CommitteeManager,
         PayloadProvider,
         ServiceSpecification,
     },
@@ -46,6 +48,7 @@ const LOG_TARGET: &str = "tari::dan::workers::states::decide";
 pub struct DecideState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
     contract_id: FixedHash,
+    shard: Shard,
     committee: Committee<TSpecification::Addr>,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
 }
@@ -54,11 +57,13 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
     pub fn new(
         node_id: TSpecification::Addr,
         contract_id: FixedHash,
+        shard: Shard,
         committee: Committee<TSpecification::Addr>,
     ) -> Self {
         Self {
             node_id,
             contract_id,
+            shard,
             committee,
             received_new_view_messages: HashMap::new(),
         }
@@ -72,6 +77,7 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
         outbound_service: &mut TSpecification::OutboundService,
         mut unit_of_work: TUnitOfWork,
         payload_provider: &mut TSpecification::PayloadProvider,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
         self.received_new_view_messages.clear();
         let timeout = sleep(timeout);
@@ -81,7 +87,7 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
                 r = inbound_services.wait_for_message(HotStuffMessageType::Commit, current_view.view_id()) => {
                     let (from, message) = r?;
                     if current_view.is_leader() {
-                        if let Some(event) = self.process_leader_message(current_view, message.clone(), &from, outbound_service).await?{
+                        if let Some(event) = self.process_leader_message(current_view, message.clone(), &from, outbound_service, committee_manager).await?{
                           break Ok(event);
                       }
                   }
@@ -106,6 +112,7 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
         message: HotStuffMessage<TSpecification::Payload>,
         sender: &TSpecification::Addr,
         outbound: &mut TSpecification::OutboundService,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
         if !message.matches(HotStuffMessageType::Commit, current_view.view_id) {
             return Ok(None);
@@ -116,6 +123,11 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
             return Ok(None);
         }
         debug!(target: LOG_TARGET, "MSG={:?}", message);
+
+        if !committee_manager.current_committee()?.contains(sender) {
+            warn!(target: LOG_TARGET, "Received message from non-member: {:?}", sender);
+            return Ok(None);
+        }
 
         self.received_new_view_messages.insert(sender.clone(), message);
 

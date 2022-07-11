@@ -24,13 +24,24 @@ use std::collections::HashMap;
 
 use log::*;
 use tari_common_types::types::FixedHash;
+use tari_dan_common_types::Shard;
 use tokio::time::{sleep, Duration};
 
 use crate::{
     digital_assets_error::DigitalAssetError,
-    models::{Committee, HotStuffMessage, HotStuffMessageType, QuorumCertificate, TreeNodeHash, View, ViewId},
+    models::{
+        Committee,
+        HotStuffMessage,
+        HotStuffMessageType,
+        MergedVoteBuilder,
+        QuorumCertificate,
+        TreeNodeHash,
+        View,
+        ViewId,
+    },
     services::{
         infrastructure_services::{InboundConnectionService, OutboundService},
+        CommitteeManager,
         ServiceSpecification,
         SigningService,
     },
@@ -44,20 +55,25 @@ pub struct PreCommitState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
     contract_id: FixedHash,
     committee: Committee<TSpecification::Addr>,
+    shard: Shard,
     received_prepare_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
+    merged_vote_builder: MergedVoteBuilder,
 }
 
 impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
     pub fn new(
         node_id: TSpecification::Addr,
-        committee: Committee<TSpecification::Addr>,
         contract_id: FixedHash,
+        shard: Shard,
+        committee: Committee<TSpecification::Addr>,
     ) -> Self {
         Self {
             node_id,
             contract_id,
+            shard,
             committee,
             received_prepare_messages: HashMap::new(),
+            merged_vote_builder: MergedVoteBuilder::new(),
         }
     }
 
@@ -69,8 +85,8 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
         outbound_service: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
         unit_of_work: TUnitOfWork,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
-        todo!();
         self.received_prepare_messages.clear();
         let mut unit_of_work = unit_of_work;
         let timeout = sleep(timeout);
@@ -81,7 +97,7 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
                     let (from, message) = r?;
                     debug!(target: LOG_TARGET, "Received message: {:?} view:{}",  message.message_type(), message.view_number());
                      if current_view.is_leader() {
-                         if let Some(event) = self.process_leader_message(current_view, message.clone(), &from, outbound_service).await? {
+                         if let Some(event) = self.process_leader_message(current_view, message.clone(), &from, outbound_service, committee_manager).await? {
                             break Ok(event);
                          }
                      }
@@ -106,6 +122,7 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
         message: HotStuffMessage<TSpecification::Payload>,
         sender: &TSpecification::Addr,
         outbound: &mut TSpecification::OutboundService,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
         debug!(
             target: LOG_TARGET,
@@ -117,7 +134,11 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
             return Ok(None);
         }
 
-        todo!("Check that message comes from local committee only");
+        if !committee_manager.current_committee()?.contains(sender) {
+            warn!(target: LOG_TARGET, "Received message from non-member: {:?}", sender);
+            return Ok(None);
+        }
+
         if self.received_prepare_messages.contains_key(sender) {
             return Ok(None);
         }
@@ -159,19 +180,19 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
         prepare_qc: QuorumCertificate,
         view_number: ViewId,
     ) -> Result<(), DigitalAssetError> {
-        let message = HotStuffMessage::pre_commit(None, Some(prepare_qc), view_number, self.contract_id);
+        let message = HotStuffMessage::pre_commit(None, Some(prepare_qc), view_number, self.shard, self.contract_id);
         outbound
             .broadcast(self.node_id.clone(), committee.members.as_slice(), message)
             .await
     }
 
     fn create_qc(&self, current_view: &View) -> Option<QuorumCertificate> {
-        let mut node_hash = None;
+        let mut node_hashes = None;
         for message in self.received_prepare_messages.values() {
-            node_hash = match node_hash {
-                None => message.node_hash().copied(),
+            node_hashes = match node_hashes {
+                None => message.node_hashes().copied(),
                 Some(n) => {
-                    if let Some(m_node) = message.node_hash() {
+                    if let Some(m_node) = message.node_hashes() {
                         if &n != m_node {
                             unimplemented!("Nodes did not match");
                         }
@@ -182,13 +203,16 @@ impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
                 },
             };
         }
-
-        let node_hash = node_hash.unwrap();
-        let mut qc = QuorumCertificate::new(HotStuffMessageType::Prepare, current_view.view_id, node_hash, None);
-        for message in self.received_prepare_messages.values() {
-            qc.combine_sig(message.partial_sig().unwrap())
+        if let Some(node_hashes) = node_hashes {
+            let mut qc =
+                QuorumCertificate::new(HotStuffMessageType::Prepare, current_view.view_id, node_hashes, vec![]);
+            for message in self.received_prepare_messages.values() {
+                qc.add_sig(message.partial_sig().unwrap())
+            }
+            Some(qc)
+        } else {
+            None
         }
-        Some(qc)
     }
 
     async fn process_replica_message<TUnitOfWork: ChainDbUnitOfWork>(

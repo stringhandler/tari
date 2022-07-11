@@ -20,12 +20,16 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::collections::HashMap;
+
+use tari_dan_common_types::Shard;
+
 use crate::models::{HotStuffMessageType, TreeNodeHash, ValidatorSignature, ViewId};
 
 #[derive(Debug, Clone)]
 pub struct DbQc {
     pub message_type: HotStuffMessageType,
     pub view_number: ViewId,
-    pub node_hash: TreeNodeHash,
-    pub signature: Option<ValidatorSignature>,
+    pub node_hashes: HashMap<Shard, TreeNodeHash>,
+    pub signatures: Vec<ValidatorSignature>,
 }

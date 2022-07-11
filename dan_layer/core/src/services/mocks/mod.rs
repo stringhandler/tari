@@ -338,6 +338,10 @@ pub struct MockCommitteeManager<TAddr: NodeAddressable> {
 }
 
 impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TAddr> {
+    fn current_shard(&self) -> Result<Shard, DigitalAssetError> {
+        Ok(self.in_shard.clone())
+    }
+
     fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError> {
         Ok(&self.current_committee)
     }
@@ -368,6 +372,28 @@ impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TA
             shards.insert(shard);
         }
         Ok(shards.len() == 1 && shards.into_iter().next().unwrap() == self.in_shard)
+    }
+
+    fn get_shard_committee(&self, shard: Shard) -> Result<Committee<TAddr>, DigitalAssetError> {
+        self.shard_mapper
+            .get_nodes_for_shard(shard)
+            .map(|nodes| Committee::new(nodes))
+    }
+
+    fn get_shards_for_keys(
+        &self,
+        shard_keys: &[ShardKey],
+    ) -> Result<HashMap<Shard, Committee<TAddr>>, DigitalAssetError> {
+        let mut shards = HashSet::new();
+        for shard_key in shard_keys {
+            let shard = self.shard_mapper.get_shard_for_key(shard_key).expect("No shard found");
+            shards.insert(shard);
+        }
+        let mut shard_committees = HashMap::new();
+        for shard in shards {
+            shard_committees.insert(shard, self.get_shard_committee(shard)?);
+        }
+        Ok(shard_committees)
     }
 }
 

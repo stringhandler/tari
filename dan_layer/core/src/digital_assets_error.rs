@@ -36,6 +36,8 @@ use crate::{
 
 #[derive(Debug, Error)]
 pub enum DigitalAssetError {
+    #[error("Message received for wrong shard")]
+    MessageReceivedForWrongShard,
     #[error("Unknown method: {method_name}")]
     _UnknownMethod { method_name: String },
     #[error("Missing argument at position {position} (name: {argument_name}")]

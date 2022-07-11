@@ -236,9 +236,11 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
             .ok_or(DigitalAssetError::MissingDatabase)?
             .new_unit_of_work(self.worker.current_view_id.as_u64());
 
+        let shard = self.worker.committee_manager.current_shard()?;
         let mut prepare = states::Prepare::<T>::new(
             self.worker.node_address.clone(),
             self.worker.asset_definition.contract_id,
+            shard,
         );
         let res = prepare
             .next_event(
@@ -268,8 +270,9 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         let mut unit_of_work = self.chain_db.new_unit_of_work();
         let mut state = states::PreCommitState::<T>::new(
             self.worker.node_address.clone(),
-            self.worker.committee_manager.current_committee()?.clone(),
             self.worker.asset_definition.contract_id,
+            self.worker.committee_manager.current_shard()?,
+            self.worker.committee_manager.current_committee()?.clone(),
         );
         let res = state
             .next_event(
@@ -279,6 +282,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
                 &mut self.worker.outbound_service,
                 &self.worker.signing_service,
                 unit_of_work.clone(),
+                &self.worker.committee_manager,
             )
             .await?;
         unit_of_work.commit()?;
@@ -290,6 +294,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         let mut state = states::CommitState::<T>::new(
             self.worker.node_address.clone(),
             self.worker.asset_definition.contract_id,
+            self.worker.committee_manager.current_shard()?,
             self.worker.committee_manager.current_committee()?.clone(),
         );
         let res = state
@@ -300,6 +305,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
                 &mut self.worker.outbound_service,
                 &self.worker.signing_service,
                 unit_of_work.clone(),
+                &self.worker.committee_manager,
             )
             .await?;
         unit_of_work.commit()?;
@@ -311,6 +317,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         let mut state = states::DecideState::<T>::new(
             self.worker.node_address.clone(),
             self.worker.asset_definition.contract_id,
+            self.worker.committee_manager.current_shard()?,
             self.worker.committee_manager.current_committee()?.clone(),
         );
         let res = state
@@ -321,24 +328,29 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
                 &mut self.worker.outbound_service,
                 unit_of_work.clone(),
                 &mut self.worker.payload_provider,
+                &self.worker.committee_manager,
             )
             .await?;
 
         unit_of_work.commit()?;
-        if let Some(mut state_tx) = self.worker.state_db_unit_of_work.take() {
-            state_tx.commit()?;
-            let signatures = state.collected_checkpoint_signatures();
-            self.worker
-                .checkpoint_manager
-                .create_checkpoint(state_tx.calculate_root()?, signatures)
-                .await?;
-            Ok(res)
+        if res == ConsensusWorkerStateEvent::Decided {
+            if let Some(mut state_tx) = self.worker.state_db_unit_of_work.take() {
+                state_tx.commit()?;
+                let signatures = state.collected_checkpoint_signatures();
+                self.worker
+                    .checkpoint_manager
+                    .create_checkpoint(state_tx.calculate_root()?, signatures)
+                    .await?;
+                Ok(res)
+            } else {
+                // technically impossible
+                error!(target: LOG_TARGET, "No state unit of work was present");
+                Err(DigitalAssetError::InvalidLogicPath {
+                    reason: "Tried to commit state after DECIDE, but no state tx was present".to_string(),
+                })
+            }
         } else {
-            // technically impossible
-            error!(target: LOG_TARGET, "No state unit of work was present");
-            Err(DigitalAssetError::InvalidLogicPath {
-                reason: "Tried to commit state after DECIDE, but no state tx was present".to_string(),
-            })
+            Ok(res)
         }
     }
 

@@ -20,10 +20,13 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::collections::HashMap;
+
 use digest::Digest;
 use tari_common_types::types::FixedHash;
 use tari_core::transactions::transaction_components::SignerSignature;
 use tari_crypto::common::Blake256;
+use tari_dan_common_types::Shard;
 
 use crate::models::{
     HotStuffMessageType,
@@ -38,10 +41,11 @@ use crate::models::{
 #[derive(Debug, Clone)]
 pub struct HotStuffMessage<TPayload: Payload> {
     view_number: ViewId,
+    shard: Shard,
     message_type: HotStuffMessageType,
     justify: Option<QuorumCertificate>,
     node: Option<HotStuffTreeNode<TPayload>>,
-    node_hash: Option<TreeNodeHash>,
+    node_hashes: Option<HashMap<Shard, TreeNodeHash>>,
     partial_sig: Option<ValidatorSignature>,
     checkpoint_signature: Option<SignerSignature>,
     contract_id: FixedHash,
@@ -50,35 +54,38 @@ pub struct HotStuffMessage<TPayload: Payload> {
 impl<TPayload: Payload> HotStuffMessage<TPayload> {
     pub fn new(
         view_number: ViewId,
+        shard: Shard,
         message_type: HotStuffMessageType,
         justify: Option<QuorumCertificate>,
         node: Option<HotStuffTreeNode<TPayload>>,
-        node_hash: Option<TreeNodeHash>,
+        node_hashes: Option<HashMap<Shard, TreeNodeHash>>,
         partial_sig: Option<ValidatorSignature>,
         checkpoint_signature: Option<SignerSignature>,
         contract_id: FixedHash,
     ) -> Self {
         Self {
             view_number,
+            shard,
             message_type,
             justify,
             node,
-            node_hash,
+            node_hashes,
             partial_sig,
             checkpoint_signature,
             contract_id,
         }
     }
 
-    pub fn new_view(prepare_qc: QuorumCertificate, view_number: ViewId, contract_id: FixedHash) -> Self {
+    pub fn new_view(prepare_qc: QuorumCertificate, view_number: ViewId, shard: Shard, contract_id: FixedHash) -> Self {
         Self {
+            shard,
             message_type: HotStuffMessageType::NewView,
             view_number,
             justify: Some(prepare_qc),
             node: None,
             partial_sig: None,
             checkpoint_signature: None,
-            node_hash: None,
+            node_hashes: None,
             contract_id,
         }
     }
@@ -87,6 +94,7 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         proposal: HotStuffTreeNode<TPayload>,
         high_qc: Option<QuorumCertificate>,
         view_number: ViewId,
+        shard: Shard,
         contract_id: FixedHash,
     ) -> Self {
         Self {
@@ -94,18 +102,25 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node: Some(proposal),
             justify: high_qc,
             view_number,
+            shard,
             partial_sig: None,
             checkpoint_signature: None,
-            node_hash: None,
+            node_hashes: None,
             contract_id,
         }
     }
 
-    pub fn vote_prepare(node_hash: TreeNodeHash, view_number: ViewId, contract_id: FixedHash) -> Self {
+    pub fn vote_prepare(
+        node_hashes: HashMap<Shard, TreeNodeHash>,
+        view_number: ViewId,
+        shard: Shard,
+        contract_id: FixedHash,
+    ) -> Self {
         Self {
             message_type: HotStuffMessageType::Prepare,
-            node_hash: Some(node_hash),
+            node_hashes: Some(node_hashes),
             view_number,
+            shard,
             node: None,
             partial_sig: None,
             checkpoint_signature: None,
@@ -118,6 +133,7 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         node: Option<HotStuffTreeNode<TPayload>>,
         prepare_qc: Option<QuorumCertificate>,
         view_number: ViewId,
+        shard: Shard,
         contract_id: FixedHash,
     ) -> Self {
         Self {
@@ -125,18 +141,25 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node,
             justify: prepare_qc,
             view_number,
-            node_hash: None,
+            shard,
+            node_hashes: None,
             checkpoint_signature: None,
             partial_sig: None,
             contract_id,
         }
     }
 
-    pub fn vote_pre_commit(node_hash: TreeNodeHash, view_number: ViewId, contract_id: FixedHash) -> Self {
+    pub fn vote_pre_commit(
+        node_hashes: HashMap<Shard, TreeNodeHash>,
+        view_number: ViewId,
+        shard: Shard,
+        contract_id: FixedHash,
+    ) -> Self {
         Self {
             message_type: HotStuffMessageType::PreCommit,
-            node_hash: Some(node_hash),
+            node_hashes: Some(node_hashes),
             view_number,
+            shard,
             node: None,
             partial_sig: None,
             checkpoint_signature: None,
@@ -149,6 +172,7 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         node: Option<HotStuffTreeNode<TPayload>>,
         pre_commit_qc: Option<QuorumCertificate>,
         view_number: ViewId,
+        shard: Shard,
         contract_id: FixedHash,
     ) -> Self {
         Self {
@@ -156,23 +180,26 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node,
             justify: pre_commit_qc,
             view_number,
+            shard,
             partial_sig: None,
             checkpoint_signature: None,
-            node_hash: None,
+            node_hashes: None,
             contract_id,
         }
     }
 
     pub fn vote_commit(
-        node_hash: TreeNodeHash,
+        node_hashes: HashMap<Shard, TreeNodeHash>,
         view_number: ViewId,
+        shard: Shard,
         contract_id: FixedHash,
         checkpoint_signature: SignerSignature,
     ) -> Self {
         Self {
             message_type: HotStuffMessageType::Commit,
-            node_hash: Some(node_hash),
+            node_hashes: Some(node_hashes),
             view_number,
+            shard,
             node: None,
             partial_sig: None,
             checkpoint_signature: Some(checkpoint_signature),
@@ -185,6 +212,7 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         node: Option<HotStuffTreeNode<TPayload>>,
         commit_qc: Option<QuorumCertificate>,
         view_number: ViewId,
+        shard: Shard,
         contract_id: FixedHash,
     ) -> Self {
         Self {
@@ -192,9 +220,10 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node,
             justify: commit_qc,
             view_number,
+            shard,
             partial_sig: None,
             checkpoint_signature: None,
-            node_hash: None,
+            node_hashes: None,
             contract_id,
         }
     }
@@ -214,6 +243,10 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
 
     pub fn view_number(&self) -> ViewId {
         self.view_number
+    }
+
+    pub fn shard(&self) -> Shard {
+        self.shard
     }
 
     pub fn contract_id(&self) -> &FixedHash {

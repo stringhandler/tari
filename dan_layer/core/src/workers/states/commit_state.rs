@@ -27,6 +27,7 @@ use rand::rngs::OsRng;
 use tari_common_types::types::{Commitment, FixedHash, PrivateKey};
 use tari_core::transactions::transaction_components::SignerSignature;
 use tari_crypto::keys::SecretKey;
+use tari_dan_common_types::Shard;
 use tokio::time::{sleep, Duration};
 
 use crate::{
@@ -36,6 +37,7 @@ use crate::{
         Committee,
         HotStuffMessage,
         HotStuffMessageType,
+        MergedVoteBuilder,
         QuorumCertificate,
         TreeNodeHash,
         View,
@@ -43,6 +45,7 @@ use crate::{
     },
     services::{
         infrastructure_services::{InboundConnectionService, OutboundService},
+        CommitteeManager,
         ServiceSpecification,
         SigningService,
     },
@@ -56,21 +59,26 @@ const LOG_TARGET: &str = "tari::dan::workers::states::commit";
 pub struct CommitState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
     contract_id: FixedHash,
+    shard: Shard,
     committee: Committee<TSpecification::Addr>,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
+    merged_vote_builder: MergedVoteBuilder,
 }
 
 impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
     pub fn new(
         node_id: TSpecification::Addr,
         contract_id: FixedHash,
+        shard: Shard,
         committee: Committee<TSpecification::Addr>,
     ) -> Self {
         Self {
             node_id,
             contract_id,
+            shard,
             committee,
             received_new_view_messages: HashMap::new(),
+            merged_vote_builder: MergedVoteBuilder::new(),
         }
     }
 
@@ -82,6 +90,7 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         outbound_service: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
         mut unit_of_work: TUnitOfWork,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
         self.received_new_view_messages.clear();
         let timeout = sleep(timeout);
@@ -91,7 +100,7 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
                r  = inbound_services.wait_for_message(HotStuffMessageType::PreCommit, current_view.view_id()) => {
                let (from, message) = r?;
                if current_view.is_leader() {
-                  if let Some(result) = self.process_leader_message(current_view, message.clone(), &from, outbound_service).await?{
+                  if let Some(result) = self.process_leader_message(current_view, message.clone(), &from, outbound_service, committee_manager).await?{
                       break Ok(result);
                   }
               }
@@ -116,6 +125,7 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         message: HotStuffMessage<TSpecification::Payload>,
         sender: &TSpecification::Addr,
         outbound: &mut TSpecification::OutboundService,
+        committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
         if !message.matches(HotStuffMessageType::PreCommit, current_view.view_id) {
             return Ok(None);
@@ -126,6 +136,15 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
             warn!(target: LOG_TARGET, "Already received message from {:?}", &sender);
             return Ok(None);
         }
+
+        if !committee_manager.current_committee()?.contains(sender) {
+            warn!(target: LOG_TARGET, "Received message from non-member: {:?}", sender);
+            return Ok(None);
+        }
+        todo!(
+            "Need to check the signatures of all the committees, otherwise just the leader of other shards can be \
+             byzantine"
+        );
 
         self.received_new_view_messages.insert(sender.clone(), message);
 

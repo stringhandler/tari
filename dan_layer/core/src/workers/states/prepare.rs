@@ -24,6 +24,7 @@ use std::{collections::HashMap, time::Duration};
 
 use log::*;
 use tari_common_types::types::FixedHash;
+use tari_dan_common_types::Shard;
 use tari_dan_engine::state::StateDbUnitOfWork;
 use tokio::time::sleep;
 
@@ -35,6 +36,7 @@ use crate::{
         HotStuffMessage,
         HotStuffMessageType,
         HotStuffTreeNode,
+        MergedVoteBuilder,
         Payload,
         QuorumCertificate,
         TreeNodeHash,
@@ -58,15 +60,19 @@ const LOG_TARGET: &str = "tari::dan::workers::states::prepare";
 pub struct Prepare<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
     contract_id: FixedHash,
+    shard: Shard,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
+    merged_vote_builder: MergedVoteBuilder,
 }
 
 impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
-    pub fn new(node_id: TSpecification::Addr, contract_id: FixedHash) -> Self {
+    pub fn new(node_id: TSpecification::Addr, contract_id: FixedHash, shard: Shard) -> Self {
         Self {
             node_id,
             contract_id,
+            shard,
             received_new_view_messages: HashMap::new(),
+            merged_vote_builder: MergedVoteBuilder::new(),
         }
     }
 
@@ -184,6 +190,11 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             return Ok(None);
         }
 
+        if !committee_manager.current_committee()?.contains(sender) {
+            warn!(target: LOG_TARGET, "Received message from non-member: {:?}", sender);
+            return Ok(None);
+        }
+
         self.received_new_view_messages.insert(sender.clone(), message);
 
         if self.received_new_view_messages.len() >= previous_committee.consensus_threshold() {
@@ -198,9 +209,10 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             let temp_state_tx = db_factory
                 .get_or_create_state_db(&self.contract_id)?
                 .new_unit_of_work(current_view.view_id.as_u64());
+            let parent = high_qc.node_hashes().get(&self.shard).unwrap();
             let proposal = self
                 .create_proposal(
-                    *high_qc.node_hash(),
+                    parent.clone(),
                     asset_definition,
                     payload_provider,
                     payload_processor,
@@ -227,7 +239,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
     }
 
     async fn process_replica_message<TChainDbUnitOfWork: ChainDbUnitOfWork, TStateDbUnitOfWork: StateDbUnitOfWork>(
-        &self,
+        &mut self,
         message: &HotStuffMessage<TSpecification::Payload>,
         current_view: &View,
         from: &TSpecification::Addr,
@@ -250,81 +262,95 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         if message.node().is_none() {
             unimplemented!("Empty message");
         }
-        if from != view_leader {
-            todo!("Allow leader from other committees");
-            println!("Message not from leader");
+        let node = message.node().unwrap();
+
+        // TODO: Maybe process empty payloads
+        if node.payload().is_empty() {
+            dbg!("Empty payload");
             return Ok(None);
         }
-        let node = message.node().unwrap();
+
         let justify = message
             .justify()
             .ok_or(DigitalAssetError::PreparePhaseNoQuorumCertificate)?;
-
-        // The genesis does not extend any node
-        if !current_view.view_id().is_genesis() {
-            todo!("Need to check this only for local consensus");
-            if !self.does_extend(node, justify.node_hash()) {
-                return Err(DigitalAssetError::PreparePhaseCertificateDoesNotExtendNode);
-            }
-
-            todo!("Need to check this only for local consensus");
-            if !self.is_safe_node(node, justify, chain_tx)? {
-                return Err(DigitalAssetError::PreparePhaseNodeNotSafe);
-            }
-        }
-
         dbg!(&node.payload().involved_shard_keys());
-        if !node.payload().is_empty() {
-            if committee_manager.are_shard_keys_in_current(&node.payload().involved_shard_keys())? {
-                // single committee consensus
-                // Nothing to do here
-            } else {
-                todo!("Merge all proposals");
-            }
+        let involved_shards = committee_manager.get_shards_for_keys(&node.payload().involved_shard_keys())?;
+        let involved_nodes = committee_manager.get_node_set_for_shards(&node.payload().involved_shard_keys())?;
+        if !involved_shards.contains_key(&message.shard()) {
+            return Err(DigitalAssetError::MessageReceivedForWrongShard);
         }
-        debug!(
-            target: LOG_TARGET,
-            "[PREPARE] Processing prepared payload for view {}",
-            current_view.view_id()
-        );
 
-        let state_root = payload_processor
-            .process_payload(node.payload(), state_tx.clone())
-            .await?;
+        if !involved_shards.contains_key(&self.shard) {
+            return Err(DigitalAssetError::MessageReceivedForWrongShard);
+        }
 
-        if state_root != *node.state_root() {
-            warn!(
-                target: LOG_TARGET,
-                "Calculated state root did not match the state root provided by the leader: Expected: {:?} Leader \
-                 provided:{:?}",
-                state_root,
-                node.state_root()
-            );
+        if (message.shard() == self.shard && from != view_leader) ||
+            !committee_manager
+                .get_shard_committee(message.shard())
+                .unwrap()
+                .contains(&from)
+        {
+            println!("Message not from leader");
             return Ok(None);
         }
 
-        debug!(
-            target: LOG_TARGET,
-            "[PREPARE] Merkle root matches payload for view {}. Adding node '{}'",
-            current_view.view_id(),
-            node.hash()
-        );
+        if message.shard() == self.shard {
+            if !self.does_extend(node, justify.node_hash(committee_manager.current_shard()?).unwrap()) {
+                return Err(DigitalAssetError::PreparePhaseCertificateDoesNotExtendNode);
+            }
 
-        chain_storage_service
-            .add_node::<TChainDbUnitOfWork>(node, chain_tx.clone())
-            .await?;
+            if !self.is_safe_node(node, justify, chain_tx)? {
+                return Err(DigitalAssetError::PreparePhaseNodeNotSafe);
+            }
 
-        todo!("Do we need to reserve the payload?");
-        payload_provider.reserve_payload(node.payload(), node.hash()).await?;
-        self.send_vote_to_leader(
-            *node.hash(),
-            outbound,
-            view_leader,
-            current_view.view_id,
-            signing_service,
-        )
-        .await?;
-        Ok(Some(ConsensusWorkerStateEvent::Prepared))
+            debug!(
+                target: LOG_TARGET,
+                "[PREPARE] Processing prepared payload for view {}",
+                current_view.view_id()
+            );
+
+            let state_root = payload_processor
+                .process_payload(node.payload(), state_tx.clone())
+                .await?;
+
+            if state_root != *node.state_root() {
+                warn!(
+                    target: LOG_TARGET,
+                    "Calculated state root did not match the state root provided by the leader: Expected: {:?} Leader \
+                     provided:{:?}",
+                    state_root,
+                    node.state_root()
+                );
+                return Ok(None);
+            }
+
+            debug!(
+                target: LOG_TARGET,
+                "[PREPARE] Merkle root matches payload for view {}. Adding node '{}'",
+                current_view.view_id(),
+                node.hash()
+            );
+
+            chain_storage_service
+                .add_node::<TChainDbUnitOfWork>(node, chain_tx.clone())
+                .await?;
+        }
+
+        self.merged_vote_builder.add(message.shard(), node.hash().clone());
+
+        if self
+            .merged_vote_builder
+            .is_complete(involved_shards.keys().map(|k| *k).collect::<Vec<_>>().as_slice())
+        {
+            let nodes = self.merged_vote_builder.build_and_clear();
+            // todo!("Do we need to reserve the payload?");
+            // payload_provider.reserve_payload(node.payload(), node.hash()).await?;
+            self.send_vote_to_leader(nodes, outbound, view_leader, current_view.view_id, signing_service)
+                .await?;
+            Ok(Some(ConsensusWorkerStateEvent::Prepared))
+        } else {
+            Ok(None)
+        }
     }
 
     fn find_highest_qc(&self) -> QuorumCertificate {
@@ -357,24 +383,21 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
     ) -> Result<HotStuffTreeNode<TSpecification::Payload>, DigitalAssetError> {
         debug!(target: LOG_TARGET, "Creating new proposal for {}", view_id);
 
-        // TODO: Artificial delay here to set the block time
-        sleep(Duration::from_secs(10)).await;
+        // if view_id.is_genesis() {
+        //     let payload = payload_provider.create_genesis_payload(asset_definition);
+        //     let state_root = payload_processor.process_payload(&payload, state_db).await?;
+        //     Ok(HotStuffTreeNode::genesis(payload, state_root))
+        // } else {
+        let payload = payload_provider.create_payload().await?;
 
-        if view_id.is_genesis() {
-            let payload = payload_provider.create_genesis_payload(asset_definition);
-            let state_root = payload_processor.process_payload(&payload, state_db).await?;
-            Ok(HotStuffTreeNode::genesis(payload, state_root))
-        } else {
-            let payload = payload_provider.create_payload().await?;
-
-            let state_root = payload_processor.process_payload(&payload, state_db).await?;
-            Ok(HotStuffTreeNode::from_parent(
-                parent,
-                payload,
-                state_root,
-                view_id.as_u64() as u32,
-            ))
-        }
+        let state_root = payload_processor.process_payload(&payload, state_db).await?;
+        Ok(HotStuffTreeNode::from_parent(
+            parent,
+            payload,
+            state_root,
+            view_id.as_u64() as u32,
+        ))
+        // }
     }
 
     async fn broadcast_proposal(
@@ -385,7 +408,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         high_qc: QuorumCertificate,
         view_number: ViewId,
     ) -> Result<(), DigitalAssetError> {
-        let message = HotStuffMessage::prepare(proposal, Some(high_qc), view_number, self.contract_id);
+        let message = HotStuffMessage::prepare(proposal, Some(high_qc), view_number, self.shard, self.contract_id);
         outbound.broadcast(self.node_id.clone(), committee, message).await
     }
 
@@ -405,14 +428,13 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
 
     async fn send_vote_to_leader(
         &self,
-        node: TreeNodeHash,
+        nodes: HashMap<Shard, TreeNodeHash>,
         outbound: &mut TSpecification::OutboundService,
         view_leader: &TSpecification::Addr,
         view_number: ViewId,
         signing_service: &TSpecification::SigningService,
     ) -> Result<(), DigitalAssetError> {
-        // TODO: Only send node hash, not the full node
-        let mut message = HotStuffMessage::vote_prepare(node, view_number, self.contract_id);
+        let mut message = HotStuffMessage::vote_prepare(nodes, view_number, self.shard, self.contract_id);
         message.add_partial_sig(signing_service.sign(&self.node_id, &message.create_signature_challenge())?);
         outbound.send(self.node_id.clone(), view_leader.clone(), message).await
     }

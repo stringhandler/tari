@@ -20,6 +20,10 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::collections::HashMap;
+
+use tari_dan_common_types::Shard;
+
 use crate::{
     models::{HotStuffMessageType, TreeNodeHash, ValidatorSignature, ViewId},
     storage::chain::DbQc,
@@ -28,37 +32,41 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct QuorumCertificate {
     message_type: HotStuffMessageType,
-    node_hash: TreeNodeHash,
+    node_hashes: HashMap<Shard, TreeNodeHash>,
     view_number: ViewId,
-    signatures: Option<ValidatorSignature>,
+    signatures: Vec<ValidatorSignature>,
 }
 
 impl QuorumCertificate {
     pub fn new(
         message_type: HotStuffMessageType,
         view_number: ViewId,
-        node_hash: TreeNodeHash,
-        signature: Option<ValidatorSignature>,
+        node_hashes: HashMap<Shard, TreeNodeHash>,
+        signatures: Vec<ValidatorSignature>,
     ) -> Self {
         Self {
             message_type,
-            node_hash,
+            node_hashes,
             view_number,
-            signatures: signature,
+            signatures,
         }
     }
 
     pub fn genesis(node_hash: TreeNodeHash) -> Self {
         Self {
             message_type: HotStuffMessageType::Genesis,
-            node_hash,
+            node_hashes: HashMap::new(),
             view_number: 0.into(),
-            signatures: None,
+            signatures: vec![],
         }
     }
 
-    pub fn node_hash(&self) -> &TreeNodeHash {
-        &self.node_hash
+    pub fn node_hashes(&self) -> &HashMap<Shard, TreeNodeHash> {
+        &self.node_hashes
+    }
+
+    pub fn node_hash(&self, shard: Shard) -> Option<&TreeNodeHash> {
+        self.node_hashes.get(&shard)
     }
 
     pub fn view_number(&self) -> ViewId {
@@ -69,15 +77,12 @@ impl QuorumCertificate {
         self.message_type
     }
 
-    pub fn signature(&self) -> Option<&ValidatorSignature> {
-        self.signatures.as_ref()
+    pub fn signatures(&self) -> &[ValidatorSignature] {
+        self.signatures.as_slice()
     }
 
-    pub fn combine_sig(&mut self, partial_sig: &ValidatorSignature) {
-        self.signatures = match &self.signatures {
-            None => Some(partial_sig.clone()),
-            Some(s) => Some(s.combine(partial_sig)),
-        };
+    pub fn add_sig(&mut self, sig: ValidatorSignature) {
+        self.signatures.add(sig)
     }
 
     pub fn matches(&self, message_type: HotStuffMessageType, view_id: ViewId) -> bool {
@@ -90,9 +95,9 @@ impl From<DbQc> for QuorumCertificate {
     fn from(rec: DbQc) -> Self {
         Self {
             message_type: rec.message_type,
-            node_hash: rec.node_hash,
+            node_hashes: rec.node_hash,
             view_number: rec.view_number,
-            signatures: rec.signature,
+            signatures: rec.signatures,
         }
     }
 }
