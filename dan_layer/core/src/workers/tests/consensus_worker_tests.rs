@@ -56,7 +56,7 @@ use crate::{
         ServiceSpecification,
     },
     storage::mocks::{chain_db::MockChainDbBackupAdapter, MockDbFactory},
-    workers::{ConsensusWorker, ConsensusWorkerBuilder},
+    workers::{single_payload_consensus_worker::SinglePayloadConsensusWorker, ConsensusWorkerBuilder},
 };
 
 fn create_identities_for_shards(num: usize) -> Vec<String> {
@@ -70,7 +70,7 @@ fn create_identities_for_shards(num: usize) -> Vec<String> {
 fn create_workers_in_shards(
     num_shards: usize,
     network: &MockNetworkHandle<String, SimplePayload>,
-) -> Vec<ConsensusWorker<MockServiceSpecification2>> {
+) -> Vec<SinglePayloadConsensusWorker<MockServiceSpecification2>> {
     let identities = create_identities_for_shards(num_shards);
 
     let mut shard_mapper = MockShardMapper::new();

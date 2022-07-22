@@ -47,8 +47,8 @@ impl<TSpecification: ServiceSpecification> Starting<TSpecification> {
 
     pub async fn next_event(
         &self,
-        base_node_client: &mut TSpecification::BaseNodeClient,
-        asset_definition: &AssetDefinition,
+        // base_node_client: &mut TSpecification::BaseNodeClient,
+        // asset_definition: &AssetDefinition,
         committee_manager: &mut TSpecification::CommitteeManager,
         db_factory: &TSpecification::DbFactory,
         node_id: &TSpecification::Addr,
@@ -86,13 +86,13 @@ impl<TSpecification: ServiceSpecification> Starting<TSpecification> {
         //     return Ok(ConsensusWorkerStateEvent::NotPartOfCommittee);
         // }
 
-        info!(
-            target: LOG_TARGET,
-            "Validator node is a committee member for asset public key '{}'", asset_definition.contract_id
-        );
+        // info!(
+        //     target: LOG_TARGET,
+        //     "Validator node is a committee member for asset public key '{}'", asset_definition.contract_id
+        // );
         // read and create the genesis block
-        info!(target: LOG_TARGET, "Creating DB");
-        let _chain_db = db_factory.get_or_create_chain_db(&asset_definition.contract_id)?;
+        // info!(target: LOG_TARGET, "Creating DB");
+        // let _chain_db = db_factory.get_or_create_chain_db(&asset_definition.contract_id)?;
 
         Ok(ConsensusWorkerStateEvent::Initialized)
     }

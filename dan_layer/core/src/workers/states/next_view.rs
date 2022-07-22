@@ -23,12 +23,13 @@
 use std::marker::PhantomData;
 
 use log::*;
+use tari_dan_common_types::Shard;
 use tari_dan_engine::state::models::StateRoot;
 use tari_shutdown::ShutdownSignal;
 
 use crate::{
     digital_assets_error::DigitalAssetError,
-    models::{AssetDefinition, Committee, HotStuffMessage, HotStuffTreeNode, QuorumCertificate, View},
+    models::{AssetDefinition, Committee, HotStuffMessage, HotStuffTreeNode, QuorumCertificate, TreeNodeHash, View},
     services::{infrastructure_services::OutboundService, PayloadProvider, ServiceSpecification},
     storage::DbFactory,
     workers::states::ConsensusWorkerStateEvent,
@@ -49,6 +50,7 @@ impl<TSpecification: ServiceSpecification> NextViewState<TSpecification> {
     pub async fn next_event(
         &mut self,
         current_view: &View,
+        shard: Shard,
         db_factory: &TSpecification::DbFactory,
         broadcast: &mut TSpecification::OutboundService,
         committee: &Committee<TSpecification::Addr>,
@@ -60,14 +62,14 @@ impl<TSpecification: ServiceSpecification> NextViewState<TSpecification> {
         let chain_db = db_factory.get_or_create_chain_db(&asset_definition.contract_id)?;
         if chain_db.is_empty()? {
             info!(target: LOG_TARGET, "Database is empty. Proposing genesis block");
-            let node = HotStuffTreeNode::genesis(
-                payload_provider.create_genesis_payload(asset_definition),
-                StateRoot::initial(),
-            );
-            let genesis_qc = QuorumCertificate::genesis(*node.hash());
+            // let node = HotStuffTreeNode::genesis(
+            //     payload_provider.create_genesis_payload(asset_definition),
+            //     StateRoot::initial(),
+            // );
+            let genesis_qc = QuorumCertificate::genesis(TreeNodeHash::zero());
             let genesis_view_no = genesis_qc.view_number();
-            let leader = committee.leader_for_view(genesis_view_no);
-            let message = HotStuffMessage::new_view(genesis_qc, genesis_view_no, asset_definition.contract_id);
+            let leader = committee.leader_for_view(0.into());
+            let message = HotStuffMessage::new_view(genesis_qc, genesis_view_no, shard);
             broadcast.send(node_id, leader.clone(), message).await?;
             Ok(ConsensusWorkerStateEvent::NewView {
                 new_view: genesis_view_no,
@@ -77,7 +79,7 @@ impl<TSpecification: ServiceSpecification> NextViewState<TSpecification> {
             debug!(target: LOG_TARGET, "--------------------------------");
             let prepare_qc = chain_db.find_highest_prepared_qc()?;
             let next_view = current_view.view_id.next();
-            let message = HotStuffMessage::new_view(prepare_qc, next_view, asset_definition.contract_id);
+            let message = HotStuffMessage::new_view(prepare_qc, next_view, shard);
             let leader = committee.leader_for_view(next_view);
             broadcast.send(node_id, leader.clone(), message).await?;
             Ok(ConsensusWorkerStateEvent::NewView { new_view: next_view })

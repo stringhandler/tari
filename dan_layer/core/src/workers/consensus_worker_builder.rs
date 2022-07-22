@@ -40,7 +40,10 @@ use crate::{
         ServiceSpecification,
     },
     storage::mocks::MockDbFactory,
-    workers::{tests::consensus_worker_tests::MockServiceSpecification2, ConsensusWorker},
+    workers::{
+        single_payload_consensus_worker::SinglePayloadConsensusWorker,
+        tests::consensus_worker_tests::MockServiceSpecification2,
+    },
 };
 
 #[cfg(test)]
@@ -49,6 +52,7 @@ pub struct ConsensusWorkerBuilder<TSpecification: ServiceSpecification> {
     shard_mapper: Option<MockShardMapper<TSpecification::Addr>>,
     phantom: std::marker::PhantomData<TSpecification>,
     network: Option<MockNetworkHandle<TSpecification::Addr, TSpecification::Payload>>,
+    // payload: Option<TSpecification::Payload>,
 }
 
 impl<TSpecification: ServiceSpecification> ConsensusWorkerBuilder<TSpecification> {
@@ -75,10 +79,15 @@ impl<TSpecification: ServiceSpecification> ConsensusWorkerBuilder<TSpecification
         self.shard_mapper = Some(shard_mapper);
         self
     }
+
+    // pub fn with_payload(mut self, payload: TSpecification::Payload) -> Self {
+    //     self.payload = Some(payload);
+    //     self
+    // }
 }
 
 impl ConsensusWorkerBuilder<MockServiceSpecification2> {
-    pub fn build(self) -> ConsensusWorker<MockServiceSpecification2> {
+    pub fn build(self) -> SinglePayloadConsensusWorker<MockServiceSpecification2> {
         let identity = self.identity.expect("Must have an identity");
         let network = self.network.expect("Network must be provided");
         let shard_mapper = self.shard_mapper.expect("Shard mapper must be provided");
@@ -86,21 +95,16 @@ impl ConsensusWorkerBuilder<MockServiceSpecification2> {
         let current_shard = shard_mapper
             .find_shard_for(&identity)
             .expect("Identity must be mapped to a shard");
-        ConsensusWorker::new(
+        SinglePayloadConsensusWorker::new(
             network.create_inbound(identity.clone()),
             network.create_outbound(),
             mock_committee_manager(shard_mapper, current_shard),
             identity.clone(),
-            mock_payload_provider(),
             mock_events_publisher(),
             mock_signing_service(),
             mock_payload_processor(),
-            Default::default(),
-            mock_base_node_client(),
             Duration::from_secs(5),
             MockDbFactory::default(),
-            MockChainStorageService::default(),
-            mock_checkpoint_manager(),
             mock_validator_node_client_factory(),
         )
     }

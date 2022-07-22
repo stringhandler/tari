@@ -56,7 +56,7 @@ impl<TAddr: NodeAddressable> MockShardMapper<TAddr> {
     }
 
     pub fn get_nodes_for_shard(&self, shard: Shard) -> Option<Vec<TAddr>> {
-        self.shard_allocation.get(shard).map(|v| v.clone())
+        self.shard_allocation.get(&shard).map(|v| v.clone())
     }
 
     pub fn find_shard_for(&self, node: &TAddr) -> Option<Shard> {

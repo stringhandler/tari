@@ -82,7 +82,7 @@ impl QuorumCertificate {
     }
 
     pub fn add_sig(&mut self, sig: ValidatorSignature) {
-        self.signatures.add(sig)
+        self.signatures.push(sig)
     }
 
     pub fn matches(&self, message_type: HotStuffMessageType, view_id: ViewId) -> bool {
@@ -95,7 +95,7 @@ impl From<DbQc> for QuorumCertificate {
     fn from(rec: DbQc) -> Self {
         Self {
             message_type: rec.message_type,
-            node_hashes: rec.node_hash,
+            node_hashes: rec.node_hashes,
             view_number: rec.view_number,
             signatures: rec.signatures,
         }

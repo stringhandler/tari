@@ -321,7 +321,7 @@ pub fn mock_committee_manager<TAddr: NodeAddressable>(
 ) -> MockCommitteeManager<TAddr> {
     let current_committee = Committee::new(
         shard_mapper
-            .get_nodes_for_shard(&in_shard)
+            .get_nodes_for_shard(in_shard)
             .expect("Failed to get nodes for shard"),
     );
     MockCommitteeManager {
@@ -358,7 +358,7 @@ impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TA
         }
         let mut nodes = HashSet::new();
         for shard in shards {
-            nodes.extend(self.shard_mapper.get_nodes_for_shard(&shard).expect("No nodes found"));
+            nodes.extend(self.shard_mapper.get_nodes_for_shard(shard).expect("No nodes found"));
         }
         // Always include itself
         nodes.extend(self.current_committee().unwrap().members.clone());
@@ -378,6 +378,7 @@ impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TA
         self.shard_mapper
             .get_nodes_for_shard(shard)
             .map(|nodes| Committee::new(nodes))
+            .ok_or(DigitalAssetError::NoCommitteeFound)
     }
 
     fn get_shards_for_keys(

@@ -50,8 +50,8 @@ impl<TSpecification: ServiceSpecification> Synchronizing<TSpecification> {
     #[allow(unreachable_code, unused_variables)]
     pub async fn next_event(
         &mut self,
-        base_node_client: &mut TSpecification::BaseNodeClient,
-        asset_definition: &AssetDefinition,
+        // base_node_client: &mut TSpecification::BaseNodeClient,
+        // asset_definition: &AssetDefinition,
         db_factory: &TSpecification::DbFactory,
         validator_node_client_factory: &TSpecification::ValidatorNodeClientFactory,
         our_address: &TSpecification::Addr,
@@ -87,16 +87,16 @@ impl<TSpecification: ServiceSpecification> Synchronizing<TSpecification> {
         //     None => return Ok(ConsensusWorkerStateEvent::BaseLayerCheckpointNotFound),
         // };
 
-        let mut state_db = db_factory.get_or_create_state_db(&asset_definition.contract_id)?;
-        {
-            // let state_reader = state_db.reader();
-            // let our_merkle_root = state_reader.calculate_root()?;
-            // if our_merkle_root.as_bytes() == last_checkpoint.merkle_root.as_slice() {
-            //     info!(target: LOG_TARGET, "Our state database is up-to-date.");
-            //     return Ok(ConsensusWorkerStateEvent::Synchronized);
-            // }
-            return Ok(ConsensusWorkerStateEvent::Synchronized);
-        }
+        // let mut state_db = db_factory.get_or_create_state_db(&asset_definition.contract_id)?;
+        // {
+        // let state_reader = state_db.reader();
+        // let our_merkle_root = state_reader.calculate_root()?;
+        // if our_merkle_root.as_bytes() == last_checkpoint.merkle_root.as_slice() {
+        //     info!(target: LOG_TARGET, "Our state database is up-to-date.");
+        //     return Ok(ConsensusWorkerStateEvent::Synchronized);
+        // }
+        // return Ok(ConsensusWorkerStateEvent::Synchronized);
+        // }
         todo!()
 
         // let committee = current_constitution

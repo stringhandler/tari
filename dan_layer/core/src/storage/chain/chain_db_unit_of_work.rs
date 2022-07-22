@@ -175,8 +175,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
             return Ok(QuorumCertificate::new(
                 locked_qc.message_type,
                 locked_qc.view_number,
-                locked_qc.node_hash,
-                locked_qc.signature.clone(),
+                locked_qc.node_hashes.clone(),
+                locked_qc.signatures.clone(),
             ));
         }
 
@@ -189,8 +189,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
             DbQc {
                 message_type: qc.message_type(),
                 view_number: qc.view_number(),
-                node_hash: *qc.node_hash(),
-                signature: qc.signature().cloned(),
+                node_hashes: qc.node_hashes().clone(),
+                signatures: qc.signatures().to_vec(),
             },
             false,
         ));
@@ -204,30 +204,31 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
             let mut locked_qc = locked_qc.get_mut();
             locked_qc.message_type = qc.message_type();
             locked_qc.view_number = qc.view_number();
-            locked_qc.node_hash = *qc.node_hash();
-            locked_qc.signature = qc.signature().cloned();
+            locked_qc.node_hashes = qc.node_hashes().clone();
+            locked_qc.signatures = qc.signatures().to_vec();
         } else {
             inner.locked_qc = Some(UnitOfWorkTracker::new(
                 DbQc {
                     message_type: qc.message_type(),
                     view_number: qc.view_number(),
-                    node_hash: *qc.node_hash(),
-                    signature: qc.signature().cloned(),
+                    node_hashes: qc.node_hashes().clone(),
+                    signatures: qc.signatures().to_vec(),
                 },
                 true,
             ));
         }
+        todo!();
 
-        debug!(
-            target: LOG_TARGET,
-            "Marking proposed node '{}' as committed",
-            qc.node_hash()
-        );
-        let found_node = inner.find_proposed_node(qc.node_hash())?;
-        let mut node = found_node.1.get_mut();
-        let mut n = node.deref_mut();
-        n.is_committed = true;
-        Ok(())
+        // debug!(
+        //     target: LOG_TARGET,
+        //     "Marking proposed node '{}' as committed",
+        //     qc.node_hash()
+        // );
+        // let found_node = inner.find_proposed_node(qc.node_hash())?;
+        // let mut node = found_node.1.get_mut();
+        // let mut n = node.deref_mut();
+        // n.is_committed = true;
+        // Ok(())
     }
 
     fn get_prepare_qc(&mut self) -> Result<Option<QuorumCertificate>, StorageError> {
@@ -238,8 +239,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
             return Ok(Some(QuorumCertificate::new(
                 prepare_qc.message_type,
                 prepare_qc.view_number,
-                prepare_qc.node_hash,
-                prepare_qc.signature.clone(),
+                prepare_qc.node_hashes.clone(),
+                prepare_qc.signatures.clone(),
             )));
         }
 
@@ -254,8 +255,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
                 DbQc {
                     message_type: qc.message_type(),
                     view_number: qc.view_number(),
-                    node_hash: *qc.node_hash(),
-                    signature: qc.signature().cloned(),
+                    node_hashes: qc.node_hashes().clone(),
+                    signatures: qc.signatures().to_vec(),
                 },
                 false,
             )
@@ -273,8 +274,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
                     DbQc {
                         message_type: qc.message_type(),
                         view_number: qc.view_number(),
-                        node_hash: *qc.node_hash(),
-                        signature: qc.signature().cloned(),
+                        node_hashes: qc.node_hashes().clone(),
+                        signatures: qc.signatures().to_vec(),
                     },
                     true,
                 ));
@@ -283,8 +284,8 @@ impl<TBackendAdapter: ChainDbBackendAdapter> ChainDbUnitOfWork for ChainDbUnitOf
                 let mut db_qc = db_qc.get_mut();
                 db_qc.message_type = qc.message_type();
                 db_qc.view_number = qc.view_number();
-                db_qc.node_hash = *qc.node_hash();
-                db_qc.signature = qc.signature().cloned();
+                db_qc.node_hashes = qc.node_hashes().clone();
+                db_qc.signatures = qc.signatures().to_vec();
             },
         }
 

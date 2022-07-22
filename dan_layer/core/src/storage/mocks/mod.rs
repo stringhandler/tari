@@ -42,7 +42,7 @@ use crate::storage::{
 #[derive(Clone, Default)]
 pub struct MockDbFactory {
     chain_db: Arc<RwLock<HashMap<FixedHash, MockChainDbBackupAdapter>>>,
-    state_db: Arc<RwLock<HashMap<FixedHash, MockStateDbBackupAdapter>>>,
+    state_db: Arc<RwLock<Option<MockStateDbBackupAdapter>>>,
     _global_db: Arc<RwLock<MockGlobalDbBackupAdapter>>,
 }
 
@@ -72,25 +72,19 @@ impl DbFactory for MockDbFactory {
         Ok(ChainDb::new(entry))
     }
 
-    fn get_state_db(
-        &self,
-        contract_id: &FixedHash,
-    ) -> Result<Option<StateDb<Self::StateDbBackendAdapter>>, StorageError> {
-        Ok(self
-            .state_db
-            .read()
-            .unwrap()
-            .get(contract_id)
-            .cloned()
-            .map(|db| StateDb::new(*contract_id, db)))
+    fn get_state_db(&self) -> Result<Option<StateDb<Self::StateDbBackendAdapter>>, StorageError> {
+        Ok(self.state_db.read().unwrap().cloned().map(|db| StateDb::new(db)))
     }
 
-    fn get_or_create_state_db(
-        &self,
-        contract_id: &FixedHash,
-    ) -> Result<StateDb<Self::StateDbBackendAdapter>, StorageError> {
-        let entry = self.state_db.write().unwrap().entry(*contract_id).or_default().clone();
-        Ok(StateDb::new(*contract_id, entry))
+    fn get_or_create_state_db(&self) -> Result<StateDb<Self::StateDbBackendAdapter>, StorageError> {
+        let guard = self.state_db.write().unwrap();
+        if let Some(x) = guard {
+            Ok(StateDb::new(x))
+        } else {
+            let x = MockStateDbBackupAdapter::default();
+            *guard = Some(x.clone());
+            Ok(StateDb::new(x))
+        }
     }
 
     fn get_or_create_global_db(&self) -> Result<GlobalDb<Self::GlobalDbBackendAdapter>, StorageError> {

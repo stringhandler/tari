@@ -20,16 +20,18 @@
 // WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 // USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-mod consensus_worker;
+// mod consensus_worker;
 #[cfg(test)]
 mod consensus_worker_builder;
 pub mod states;
 #[cfg(test)]
 mod tests;
 
-pub use consensus_worker::ConsensusWorker;
+// pub use consensus_worker::ConsensusWorker;
 #[cfg(test)]
 pub use consensus_worker_builder::ConsensusWorkerBuilder;
 
+mod single_payload_consensus_worker;
 mod state_sync;
+
 pub use state_sync::StateSyncError;

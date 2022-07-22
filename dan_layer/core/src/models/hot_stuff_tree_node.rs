@@ -28,7 +28,7 @@ use crate::models::{Payload, TreeNodeHash};
 
 #[derive(Debug, Clone)]
 pub struct HotStuffTreeNode<TPayload: Payload> {
-    parents: Vec<TreeNodeHash>,
+    parent: TreeNodeHash,
     payload: TPayload,
     state_root: StateRoot,
     hash: TreeNodeHash,
@@ -36,25 +36,13 @@ pub struct HotStuffTreeNode<TPayload: Payload> {
 }
 
 impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
-    pub fn new(parents: Vec<TreeNodeHash>, payload: TPayload, state_root: StateRoot, height: u32) -> Self {
+    pub fn new(parent: TreeNodeHash, payload: TPayload, state_root: StateRoot, height: u32) -> Self {
         let mut s = HotStuffTreeNode {
-            parents,
+            parent,
             payload,
             state_root,
             hash: TreeNodeHash::zero(),
             height,
-        };
-        s.hash = s.calculate_hash();
-        s
-    }
-
-    pub fn genesis(payload: TPayload, state_root: StateRoot) -> HotStuffTreeNode<TPayload> {
-        let mut s = Self {
-            parents: vec![],
-            payload,
-            hash: TreeNodeHash::zero(),
-            state_root,
-            height: 0,
         };
         s.hash = s.calculate_hash();
         s
@@ -71,10 +59,11 @@ impl<TPayload: Payload> HotStuffTreeNode<TPayload> {
 
     pub fn calculate_hash(&self) -> TreeNodeHash {
         let mut hash = Blake256::new();
-        hash = hash.chain(self.parents.len());
-        for parent in &self.parents {
-            hash = hash.chain(parent.as_bytes);
-        }
+        // hash = hash.chain((self.parents.len() as u64).to_le_bytes());
+        // for parent in &self.parents {
+        //     hash = hash.chain(parent.as_bytes());
+        // }
+        hash = hash.chain(self.parent.as_bytes());
         let hash = hash
             .chain(self.payload.consensus_hash())
             .chain(self.height.to_le_bytes())

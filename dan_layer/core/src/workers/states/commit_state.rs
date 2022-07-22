@@ -82,14 +82,14 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         }
     }
 
-    pub async fn next_event<TUnitOfWork: ChainDbUnitOfWork>(
+    pub async fn next_event(
         &mut self,
         timeout: Duration,
         current_view: &View,
         inbound_services: &TSpecification::InboundConnectionService,
         outbound_service: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
-        mut unit_of_work: TUnitOfWork,
+        // mut unit_of_work: TUnitOfWork,
         committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
         self.received_new_view_messages.clear();
@@ -108,7 +108,7 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
             r =  inbound_services.wait_for_qc(HotStuffMessageType::PreCommit, current_view.view_id()) => {
                 let (from, message) = r?;
                 let leader = self.committee.leader_for_view(current_view.view_id).clone();
-                if let Some(result) = self.process_replica_message(&message, current_view, &from, &leader,  outbound_service, signing_service, &mut unit_of_work).await? {
+                if let Some(result) = self.process_replica_message(&message, current_view, &from, &leader,  outbound_service, signing_service).await? {
                     break Ok(result);
                 }
             }
@@ -157,7 +157,8 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
             );
 
             if let Some(qc) = self.create_qc(current_view) {
-                self.broadcast(outbound, qc, current_view.view_id).await?;
+                self.broadcast(outbound, qc, committee_manager, current_view.view_id)
+                    .await?;
                 return Ok(None); // Replica will move this on
             }
             warn!(target: LOG_TARGET, "committee did not agree on node");
@@ -177,11 +178,17 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         &self,
         outbound: &mut TSpecification::OutboundService,
         pre_commit_qc: QuorumCertificate,
+        committee_manager: &TSpecification::CommitteeManager,
         view_number: ViewId,
     ) -> Result<(), DigitalAssetError> {
-        let message = HotStuffMessage::commit(None, Some(pre_commit_qc), view_number, self.contract_id);
+        let mut all_shard_nodes = vec![];
+        for shard in pre_commit_qc.node_hashes().keys() {
+            all_shard_nodes.extend(committee_manager.get_shard_committee(*shard)?.members);
+        }
+        let message = HotStuffMessage::commit(None, Some(pre_commit_qc), view_number, self.shard);
+
         outbound
-            .broadcast(self.node_id.clone(), self.committee.members.as_slice(), message)
+            .broadcast(self.node_id.clone(), all_shard_nodes.as_slice(), message)
             .await
     }
 
@@ -201,33 +208,34 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
     }
 
     fn create_qc(&self, current_view: &View) -> Option<QuorumCertificate> {
-        // TODO: This can be done in one loop instead of two
-        let mut node_hash = None;
-        for message in self.received_new_view_messages.values() {
-            node_hash = match node_hash {
-                None => message.node_hash().copied(),
-                Some(n) => {
-                    if let Some(m_node) = message.node_hash() {
-                        if &n != m_node {
-                            unimplemented!("Nodes did not match");
-                        }
-                        Some(*m_node)
-                    } else {
-                        Some(n)
-                    }
-                },
-            };
-        }
-
-        let node_hash = node_hash.unwrap();
-        let mut qc = QuorumCertificate::new(HotStuffMessageType::PreCommit, current_view.view_id, node_hash, None);
-        for message in self.received_new_view_messages.values() {
-            qc.combine_sig(message.partial_sig().unwrap())
-        }
-        Some(qc)
+        // // TODO: This can be done in one loop instead of two
+        // let mut node_hash = None;
+        // for message in self.received_new_view_messages.values() {
+        //     node_hash = match node_hash {
+        //         None => message.node_hash().copied(),
+        //         Some(n) => {
+        //             if let Some(m_node) = message.node_hash() {
+        //                 if &n != m_node {
+        //                     unimplemented!("Nodes did not match");
+        //                 }
+        //                 Some(*m_node)
+        //             } else {
+        //                 Some(n)
+        //             }
+        //         },
+        //     };
+        // }
+        //
+        // let node_hash = node_hash.unwrap();
+        // let mut qc = QuorumCertificate::new(HotStuffMessageType::PreCommit, current_view.view_id, node_hash, None);
+        // for message in self.received_new_view_messages.values() {
+        //     qc.combine_sig(message.partial_sig().unwrap())
+        // }
+        // Some(qc)
+        todo!()
     }
 
-    async fn process_replica_message<TUnitOfWork: ChainDbUnitOfWork>(
+    async fn process_replica_message(
         &mut self,
         message: &HotStuffMessage<TSpecification::Payload>,
         current_view: &View,
@@ -235,42 +243,42 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         view_leader: &TSpecification::Addr,
         outbound: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
-        unit_of_work: &mut TUnitOfWork,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
-        if let Some(justify) = message.justify() {
-            if !justify.matches(HotStuffMessageType::PreCommit, current_view.view_id) {
-                warn!(
-                    target: LOG_TARGET,
-                    "Wrong justify message type received, log: {} {:?} {}",
-                    &self.node_id,
-                    &justify.message_type(),
-                    current_view.view_id
-                );
-                return Ok(None);
-            }
-            // if message.node().is_none() {
-            //     unimplemented!("Empty message");
-            // }
-
-            if from != view_leader {
-                warn!(target: LOG_TARGET, "Message not from leader");
-                return Ok(None);
-            }
-
-            unit_of_work.set_locked_qc(justify)?;
-            self.send_vote_to_leader(
-                *justify.node_hash(),
-                outbound,
-                view_leader,
-                current_view.view_id,
-                signing_service,
-            )
-            .await?;
-            Ok(Some(ConsensusWorkerStateEvent::Committed))
-        } else {
-            warn!(target: LOG_TARGET, "received non justify message");
-            Ok(None)
-        }
+        todo!()
+        // if let Some(justify) = message.justify() {
+        //     if !justify.matches(HotStuffMessageType::PreCommit, current_view.view_id) {
+        //         warn!(
+        //             target: LOG_TARGET,
+        //             "Wrong justify message type received, log: {} {:?} {}",
+        //             &self.node_id,
+        //             &justify.message_type(),
+        //             current_view.view_id
+        //         );
+        //         return Ok(None);
+        //     }
+        //     // if message.node().is_none() {
+        //     //     unimplemented!("Empty message");
+        //     // }
+        //
+        //     if from != view_leader {
+        //         warn!(target: LOG_TARGET, "Message not from leader");
+        //         return Ok(None);
+        //     }
+        //
+        //     unit_of_work.set_locked_qc(justify)?;
+        //     self.send_vote_to_leader(
+        //         *justify.node_hash(),
+        //         outbound,
+        //         view_leader,
+        //         current_view.view_id,
+        //         signing_service,
+        //     )
+        //     .await?;
+        //     Ok(Some(ConsensusWorkerStateEvent::Committed))
+        // } else {
+        //     warn!(target: LOG_TARGET, "received non justify message");
+        //     Ok(None)
+        // }
     }
 
     async fn send_vote_to_leader(
@@ -281,9 +289,11 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
         view_number: ViewId,
         signing_service: &TSpecification::SigningService,
     ) -> Result<(), DigitalAssetError> {
-        let checkpoint_signature = self.generate_checkpoint_signature();
-        let mut message = HotStuffMessage::vote_commit(node, view_number, self.contract_id, checkpoint_signature);
-        message.add_partial_sig(signing_service.sign(&self.node_id, &message.create_signature_challenge())?);
-        outbound.send(self.node_id.clone(), view_leader.clone(), message).await
+        todo!()
+        // let checkpoint_signature = self.generate_checkpoint_signature();
+        // let mut message =
+        //     HotStuffMessage::vote_commit(node, view_number, self.shard, self.contract_id, checkpoint_signature);
+        // message.add_partial_sig(signing_service.sign(&self.node_id, &message.create_signature_challenge())?);
+        // outbound.send(self.node_id.clone(), view_leader.clone(), message).await
     }
 }

@@ -46,13 +46,10 @@ pub trait DbFactory: Sync + Send + 'static {
 
     fn get_state_db(
         &self,
-        contract_id: &FixedHash,
+        // contract_id: &FixedHash,
     ) -> Result<Option<StateDb<Self::StateDbBackendAdapter>>, StorageError>;
 
-    fn get_or_create_state_db(
-        &self,
-        contract_id: &FixedHash,
-    ) -> Result<StateDb<Self::StateDbBackendAdapter>, StorageError>;
+    fn get_or_create_state_db(&self) -> Result<StateDb<Self::StateDbBackendAdapter>, StorageError>;
 
     fn get_or_create_global_db(&self) -> Result<GlobalDb<Self::GlobalDbBackendAdapter>, StorageError>;
 }

@@ -59,37 +59,36 @@ const LOG_TARGET: &str = "tari::dan::workers::states::prepare";
 
 pub struct Prepare<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
-    contract_id: FixedHash,
     shard: Shard,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
     merged_vote_builder: MergedVoteBuilder,
 }
 
 impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
-    pub fn new(node_id: TSpecification::Addr, contract_id: FixedHash, shard: Shard) -> Self {
+    pub fn new(node_id: TSpecification::Addr, shard: Shard) -> Self {
         Self {
             node_id,
-            contract_id,
             shard,
             received_new_view_messages: HashMap::new(),
             merged_vote_builder: MergedVoteBuilder::new(),
         }
     }
 
-    pub async fn next_event<TChainDbUnitOfWork: ChainDbUnitOfWork, TStateDbUnitOfWork: StateDbUnitOfWork>(
+    pub async fn next_event<
+        TStateDbUnitOfWork: StateDbUnitOfWork,
+        TPayloadProvider: PayloadProvider<TSpecification::Payload>,
+    >(
         &mut self,
         current_view: &View,
         timeout: Duration,
-        asset_definition: &AssetDefinition,
         committee: &Committee<TSpecification::Addr>,
         committee_manager: &TSpecification::CommitteeManager,
         inbound_services: &TSpecification::InboundConnectionService,
         outbound_service: &mut TSpecification::OutboundService,
-        payload_provider: &mut TSpecification::PayloadProvider,
+        payload_provider: &mut TPayloadProvider,
         signing_service: &TSpecification::SigningService,
         payload_processor: &mut TSpecification::PayloadProcessor,
-        chain_storage_service: &TSpecification::ChainStorageService,
-        mut chain_tx: TChainDbUnitOfWork,
+        // mut chain_tx: TChainDbUnitOfWork,
         state_tx: &mut TStateDbUnitOfWork,
         db_factory: &TSpecification::DbFactory,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
@@ -123,7 +122,6 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                             current_view,
                             message.clone(),
                             &from,
-                            asset_definition,
                             committee,
                             committee_manager,
                             payload_provider,
@@ -146,10 +144,8 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                         outbound_service,
                         signing_service,
                         payload_processor,
-                        payload_provider,
-                        &mut chain_tx,
+                        // &mut chain_tx,
                         committee_manager,
-                        chain_storage_service,
                         state_tx,
                     ).await? {
                         break Ok(event);
@@ -164,15 +160,14 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         }
     }
 
-    async fn process_leader_message(
+    async fn process_leader_message<TPayloadProvider: PayloadProvider<TSpecification::Payload>>(
         &mut self,
         current_view: &View,
         message: HotStuffMessage<TSpecification::Payload>,
         sender: &TSpecification::Addr,
-        asset_definition: &AssetDefinition,
         previous_committee: &Committee<TSpecification::Addr>,
         committee_manager: &TSpecification::CommitteeManager,
-        payload_provider: &TSpecification::PayloadProvider,
+        payload_provider: &TPayloadProvider,
         payload_processor: &mut TSpecification::PayloadProcessor,
         outbound: &mut TSpecification::OutboundService,
         db_factory: &TSpecification::DbFactory,
@@ -207,25 +202,26 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
             let high_qc = self.find_highest_qc();
 
             let temp_state_tx = db_factory
-                .get_or_create_state_db(&self.contract_id)?
+                .get_or_create_state_db()?
                 .new_unit_of_work(current_view.view_id.as_u64());
             let parent = high_qc.node_hashes().get(&self.shard).unwrap();
-            let proposal = self
-                .create_proposal(
-                    parent.clone(),
-                    asset_definition,
-                    payload_provider,
-                    payload_processor,
-                    current_view.view_id,
-                    temp_state_tx,
-                )
-                .await?;
-            let shard_keys = proposal.payload().involved_shard_keys();
-            dbg!(&shard_keys);
-            let total_committee_set = committee_manager.get_node_set_for_shards(&shard_keys)?;
-            dbg!(&total_committee_set);
-            self.broadcast_proposal(outbound, &total_committee_set, proposal, high_qc, current_view.view_id)
-                .await?;
+            todo!("proposal");
+            // let proposal = self
+            //     .create_proposal(
+            //         parent.clone(),
+            //         asset_definition,
+            //         payload_provider,
+            //         payload_processor,
+            //         current_view.view_id,
+            //         temp_state_tx,
+            //     )
+            //     .await?;
+            // let shard_keys = proposal.payload().involved_shard_keys();
+            // dbg!(&shard_keys);
+            // let total_committee_set = committee_manager.get_node_set_for_shards(&shard_keys)?;
+            // dbg!(&total_committee_set);
+            // self.broadcast_proposal(outbound, &total_committee_set, proposal, high_qc, current_view.view_id)
+            //     .await?;
             Ok(None) // Will move to pre-commit when it receives the message as a replica
         } else {
             debug!(
@@ -238,7 +234,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         }
     }
 
-    async fn process_replica_message<TChainDbUnitOfWork: ChainDbUnitOfWork, TStateDbUnitOfWork: StateDbUnitOfWork>(
+    async fn process_replica_message<TStateDbUnitOfWork: StateDbUnitOfWork>(
         &mut self,
         message: &HotStuffMessage<TSpecification::Payload>,
         current_view: &View,
@@ -247,10 +243,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         outbound: &mut TSpecification::OutboundService,
         signing_service: &TSpecification::SigningService,
         payload_processor: &mut TSpecification::PayloadProcessor,
-        payload_provider: &mut TSpecification::PayloadProvider,
-        chain_tx: &mut TChainDbUnitOfWork,
         committee_manager: &TSpecification::CommitteeManager,
-        chain_storage_service: &TSpecification::ChainStorageService,
         state_tx: &mut TStateDbUnitOfWork,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
         debug!(
@@ -299,9 +292,11 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                 return Err(DigitalAssetError::PreparePhaseCertificateDoesNotExtendNode);
             }
 
-            if !self.is_safe_node(node, justify, chain_tx)? {
-                return Err(DigitalAssetError::PreparePhaseNodeNotSafe);
-            }
+            todo!("safe node needs to be fixed");
+
+            // if !self.is_safe_node(node, justify, chain_tx)? {
+            //     return Err(DigitalAssetError::PreparePhaseNodeNotSafe);
+            // }
 
             debug!(
                 target: LOG_TARGET,
@@ -331,9 +326,10 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
                 node.hash()
             );
 
-            chain_storage_service
-                .add_node::<TChainDbUnitOfWork>(node, chain_tx.clone())
-                .await?;
+            todo!("Add node needs to be fixed");
+            // chain_storage_service
+            //     .add_node::<TChainDbUnitOfWork>(node, chain_tx.clone())
+            //     .await?;
         }
 
         self.merged_vote_builder.add(message.shard(), node.hash().clone());
@@ -408,7 +404,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         high_qc: QuorumCertificate,
         view_number: ViewId,
     ) -> Result<(), DigitalAssetError> {
-        let message = HotStuffMessage::prepare(proposal, Some(high_qc), view_number, self.shard, self.contract_id);
+        let message = HotStuffMessage::prepare(proposal, Some(high_qc), view_number, self.shard);
         outbound.broadcast(self.node_id.clone(), committee, message).await
     }
 
@@ -434,7 +430,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         view_number: ViewId,
         signing_service: &TSpecification::SigningService,
     ) -> Result<(), DigitalAssetError> {
-        let mut message = HotStuffMessage::vote_prepare(nodes, view_number, self.shard, self.contract_id);
+        let mut message = HotStuffMessage::vote_prepare(nodes, view_number, self.shard);
         message.add_partial_sig(signing_service.sign(&self.node_id, &message.create_signature_challenge())?);
         outbound.send(self.node_id.clone(), view_leader.clone(), message).await
     }

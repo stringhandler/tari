@@ -44,22 +44,22 @@ pub trait StateDbUnitOfWorkReader: Clone + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct UnitOfWorkContext {
-    contract_id: FixedHash,
+    // contract_id: FixedHash,
     height: u64,
 }
 
 impl UnitOfWorkContext {
-    pub fn new(height: u64, contract_id: FixedHash) -> Self {
-        Self { height, contract_id }
+    pub fn new(height: u64) -> Self {
+        Self { height }
     }
 
     pub fn height(&self) -> u64 {
         self.height
     }
 
-    pub fn contract_id(&self) -> &FixedHash {
-        &self.contract_id
-    }
+    // pub fn contract_id(&self) -> &FixedHash {
+    //     &self.contract_id
+    // }
 }
 
 pub struct StateDbUnitOfWorkImpl<TBackendAdapter: StateDbBackendAdapter> {

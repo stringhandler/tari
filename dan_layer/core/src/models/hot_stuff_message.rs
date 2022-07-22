@@ -48,7 +48,6 @@ pub struct HotStuffMessage<TPayload: Payload> {
     node_hashes: Option<HashMap<Shard, TreeNodeHash>>,
     partial_sig: Option<ValidatorSignature>,
     checkpoint_signature: Option<SignerSignature>,
-    contract_id: FixedHash,
 }
 
 impl<TPayload: Payload> HotStuffMessage<TPayload> {
@@ -61,7 +60,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         node_hashes: Option<HashMap<Shard, TreeNodeHash>>,
         partial_sig: Option<ValidatorSignature>,
         checkpoint_signature: Option<SignerSignature>,
-        contract_id: FixedHash,
     ) -> Self {
         Self {
             view_number,
@@ -72,11 +70,10 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node_hashes,
             partial_sig,
             checkpoint_signature,
-            contract_id,
         }
     }
 
-    pub fn new_view(prepare_qc: QuorumCertificate, view_number: ViewId, shard: Shard, contract_id: FixedHash) -> Self {
+    pub fn new_view(prepare_qc: QuorumCertificate, view_number: ViewId, shard: Shard) -> Self {
         Self {
             shard,
             message_type: HotStuffMessageType::NewView,
@@ -86,7 +83,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             node_hashes: None,
-            contract_id,
         }
     }
 
@@ -95,7 +91,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         high_qc: Option<QuorumCertificate>,
         view_number: ViewId,
         shard: Shard,
-        contract_id: FixedHash,
     ) -> Self {
         Self {
             message_type: HotStuffMessageType::Prepare,
@@ -106,16 +101,10 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             node_hashes: None,
-            contract_id,
         }
     }
 
-    pub fn vote_prepare(
-        node_hashes: HashMap<Shard, TreeNodeHash>,
-        view_number: ViewId,
-        shard: Shard,
-        contract_id: FixedHash,
-    ) -> Self {
+    pub fn vote_prepare(node_hashes: HashMap<Shard, TreeNodeHash>, view_number: ViewId, shard: Shard) -> Self {
         Self {
             message_type: HotStuffMessageType::Prepare,
             node_hashes: Some(node_hashes),
@@ -125,7 +114,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             justify: None,
-            contract_id,
         }
     }
 
@@ -134,7 +122,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         prepare_qc: Option<QuorumCertificate>,
         view_number: ViewId,
         shard: Shard,
-        contract_id: FixedHash,
     ) -> Self {
         Self {
             message_type: HotStuffMessageType::PreCommit,
@@ -145,16 +132,10 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             node_hashes: None,
             checkpoint_signature: None,
             partial_sig: None,
-            contract_id,
         }
     }
 
-    pub fn vote_pre_commit(
-        node_hashes: HashMap<Shard, TreeNodeHash>,
-        view_number: ViewId,
-        shard: Shard,
-        contract_id: FixedHash,
-    ) -> Self {
+    pub fn vote_pre_commit(node_hashes: HashMap<Shard, TreeNodeHash>, view_number: ViewId, shard: Shard) -> Self {
         Self {
             message_type: HotStuffMessageType::PreCommit,
             node_hashes: Some(node_hashes),
@@ -164,7 +145,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             justify: None,
-            contract_id,
         }
     }
 
@@ -173,7 +153,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         pre_commit_qc: Option<QuorumCertificate>,
         view_number: ViewId,
         shard: Shard,
-        contract_id: FixedHash,
     ) -> Self {
         Self {
             message_type: HotStuffMessageType::Commit,
@@ -184,7 +163,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             node_hashes: None,
-            contract_id,
         }
     }
 
@@ -192,7 +170,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         node_hashes: HashMap<Shard, TreeNodeHash>,
         view_number: ViewId,
         shard: Shard,
-        contract_id: FixedHash,
         checkpoint_signature: SignerSignature,
     ) -> Self {
         Self {
@@ -204,7 +181,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: Some(checkpoint_signature),
             justify: None,
-            contract_id,
         }
     }
 
@@ -213,7 +189,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         commit_qc: Option<QuorumCertificate>,
         view_number: ViewId,
         shard: Shard,
-        contract_id: FixedHash,
     ) -> Self {
         Self {
             message_type: HotStuffMessageType::Decide,
@@ -224,7 +199,6 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             partial_sig: None,
             checkpoint_signature: None,
             node_hashes: None,
-            contract_id,
         }
     }
 
@@ -234,8 +208,13 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
             .chain(self.view_number.as_u64().to_le_bytes());
         if let Some(ref node) = self.node {
             b = b.chain(node.calculate_hash().as_bytes());
-        } else if let Some(ref node_hash) = self.node_hash {
-            b = b.chain(node_hash.as_bytes());
+        } else if let Some(ref node_hash) = self.node_hashes {
+            b = b.chain((node_hash.len() as u64).to_le_bytes());
+            for (shard, hash) in node_hash {
+                b = b.chain(shard.id.to_le_bytes());
+                b = b.chain(hash.as_bytes());
+            }
+            // b = b.chain(node_hash.as_bytes());
         } else {
         }
         b.finalize().to_vec()
@@ -249,16 +228,8 @@ impl<TPayload: Payload> HotStuffMessage<TPayload> {
         self.shard
     }
 
-    pub fn contract_id(&self) -> &FixedHash {
-        &self.contract_id
-    }
-
     pub fn node(&self) -> Option<&HotStuffTreeNode<TPayload>> {
         self.node.as_ref()
-    }
-
-    pub fn node_hash(&self) -> Option<&TreeNodeHash> {
-        self.node_hash.as_ref()
     }
 
     pub fn message_type(&self) -> HotStuffMessageType {
