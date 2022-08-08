@@ -36,6 +36,8 @@ use crate::{
 
 #[derive(Debug, Error)]
 pub enum DigitalAssetError {
+    #[error("Payload not found")]
+    PayloadNotFound,
     #[error("No committee found")]
     NoCommitteeFound,
     #[error("Message received for wrong shard")]

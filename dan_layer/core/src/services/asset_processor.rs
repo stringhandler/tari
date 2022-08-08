@@ -34,7 +34,6 @@ use crate::{
     digital_assets_error::DigitalAssetError,
     models::{AssetDefinition, InstructionSet},
     template_command::ExecutionResult,
-    templates::{tip002_template, tip004_template, tip721_template},
 };
 
 pub trait AssetProcessor: Sync + Send + 'static {
@@ -126,16 +125,17 @@ impl TemplateFactory {
     pub fn initial_instructions(&self, template_param: &TemplateParameter) -> InstructionSet {
         use tari_dan_common_types::TemplateId::{EditableMetadata, Tip002, Tip003, Tip004, Tip721};
         // TODO: We may want to use the TemplateId type, so that we know it is known/valid
-        let template_id = template_param.template_id.try_into().unwrap();
-        match template_id {
-            Tip002 => tip002_template::initial_instructions(template_param),
-            Tip003 => todo!(),
-            Tip004 => tip004_template::initial_instructions(template_param),
-            Tip721 => tip721_template::initial_instructions(template_param),
-            EditableMetadata => {
-                todo!()
-            },
-        }
+        // let template_id = template_param.template_id.try_into().unwrap();
+        todo!();
+        // match template_id {
+        // Tip002 => tip002_template::initial_instructions(template_param),
+        // Tip003 => todo!(),
+        // Tip004 => tip004_template::initial_instructions(template_param),
+        // Tip721 => tip721_template::initial_instructions(template_param),
+        // EditableMetadata => {
+        //     todo!()
+        // },
+        // }
     }
 
     pub fn invoke_read_method<TUnitOfWork: StateDbUnitOfWorkReader>(
@@ -144,15 +144,16 @@ impl TemplateFactory {
         state_db: &TUnitOfWork,
     ) -> Result<Option<Vec<u8>>, DigitalAssetError> {
         use tari_dan_common_types::TemplateId::{EditableMetadata, Tip002, Tip003, Tip004, Tip721};
-        match instruction.template_id() {
-            Tip002 => tip002_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
-            Tip003 => todo!(),
-            Tip004 => tip004_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
-            Tip721 => tip721_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
-            EditableMetadata => {
-                todo!()
-            },
-        }
+        // match instruction.template_id() {
+        //     Tip002 => tip002_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
+        //     Tip003 => todo!(),
+        //     Tip004 => tip004_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
+        //     Tip721 => tip721_template::invoke_read_method(instruction.method(), instruction.args(), state_db),
+        //     EditableMetadata => {
+        //         todo!()
+        //     },
+        // }
+        todo!()
     }
 
     pub fn invoke_write_method<TUnitOfWork: StateDbUnitOfWork>(
@@ -161,15 +162,16 @@ impl TemplateFactory {
         state_db: &mut TUnitOfWork,
     ) -> Result<(), DigitalAssetError> {
         use tari_dan_common_types::TemplateId::{EditableMetadata, Tip002, Tip003, Tip004, Tip721};
-        match instruction.template_id() {
-            Tip002 => tip002_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
-            Tip003 => todo!(),
-            Tip004 => tip004_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
-            Tip721 => tip721_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
-            EditableMetadata => {
-                todo!()
-            },
-        }
+        // match instruction.template_id() {
+        //     Tip002 => tip002_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
+        //     Tip003 => todo!(),
+        //     Tip004 => tip004_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
+        //     Tip721 => tip721_template::invoke_write_method(instruction.method(), instruction.args(), state_db),
+        //     EditableMetadata => {
+        //         todo!()
+        //     },
+        // }
+        todo!()
     }
 }
 

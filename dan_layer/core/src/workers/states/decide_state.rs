@@ -47,22 +47,15 @@ const LOG_TARGET: &str = "tari::dan::workers::states::decide";
 // TODO: This is very similar to pre-commit, and commit state
 pub struct DecideState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
-    contract_id: FixedHash,
     shard: Shard,
     committee: Committee<TSpecification::Addr>,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
 }
 
 impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
-    pub fn new(
-        node_id: TSpecification::Addr,
-        contract_id: FixedHash,
-        shard: Shard,
-        committee: Committee<TSpecification::Addr>,
-    ) -> Self {
+    pub fn new(node_id: TSpecification::Addr, shard: Shard, committee: Committee<TSpecification::Addr>) -> Self {
         Self {
             node_id,
-            contract_id,
             shard,
             committee,
             received_new_view_messages: HashMap::new(),
@@ -76,7 +69,7 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
         inbound_services: &mut TSpecification::InboundConnectionService,
         outbound_service: &mut TSpecification::OutboundService,
         // mut unit_of_work: TUnitOfWork,
-        payload_provider: &mut TSpecification::PayloadProvider,
+        // payload_provider: &mut TSpecification::PayloadProvider,
         committee_manager: &TSpecification::CommitteeManager,
     ) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
         self.received_new_view_messages.clear();
@@ -95,7 +88,7 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
               r = inbound_services.wait_for_qc(HotStuffMessageType::Commit, current_view.view_id()) => {
                     let (from, message) = r?;
                     let leader= self.committee.leader_for_view(current_view.view_id).clone();
-                      if let Some(event) = self.process_replica_message(&message, current_view, &from, &leader, payload_provider).await? {
+                      if let Some(event) = self.process_replica_message(&message, current_view, &from, &leader).await? {
                           break Ok(event);
                       }
               },
@@ -208,7 +201,6 @@ impl<TSpecification: ServiceSpecification> DecideState<TSpecification> {
         from: &TSpecification::Addr,
         view_leader: &TSpecification::Addr,
         // unit_of_work: &mut TUnitOfWork,
-        payload_provider: &mut TSpecification::PayloadProvider,
     ) -> Result<Option<ConsensusWorkerStateEvent>, DigitalAssetError> {
         todo!()
         // debug!(target: LOG_TARGET, "[DECIDE] replica message: {:?}", message);

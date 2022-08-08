@@ -116,6 +116,14 @@ impl<TSpecification: ServiceSpecification> SinglePayloadConsensusWorker<TSpecifi
         })
     }
 
+    /// Run on full view. Mainly used for debugging
+    pub async fn step(&mut self, payload: TSpecification::Payload) -> Result<(), DigitalAssetError> {
+        let shutdown = Shutdown::new();
+        let stop = AtomicBool::new(false);
+
+        self.run(shutdown.to_signal(), Some(1), Arc::new(stop), payload).await
+    }
+
     pub async fn run(
         &mut self,
         shutdown: ShutdownSignal,
@@ -180,7 +188,8 @@ impl<TSpecification: ServiceSpecification> SinglePayloadConsensusWorker<TSpecifi
         use ConsensusWorkerStateEvent::*;
         let from = self.state;
         self.state = match (&self.state, event) {
-            (Starting, Initialized) => Synchronizing,
+            // TODO: synchronize
+            (Starting, Initialized) => NextView,
             (Synchronizing, Synchronized) => NextView,
             (_, NotPartOfCommittee) => Idle,
             (Idle, TimedOut) => Starting,
@@ -220,7 +229,10 @@ struct SimplePayloadProvider<TPayload: Payload> {
 #[async_trait]
 impl<TPayload: Payload> PayloadProvider<TPayload> for SimplePayloadProvider<TPayload> {
     async fn create_payload(&self) -> Result<TPayload, DigitalAssetError> {
-        self.payload.cloned().ok_or(DigitalAssetError::PayloadNotFound)
+        self.payload
+            .as_ref()
+            .map(|p| p.clone())
+            .ok_or(DigitalAssetError::PayloadNotFound)
     }
 
     fn create_genesis_payload(&self, asset_definition: &AssetDefinition) -> TPayload {
@@ -302,7 +314,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         let shard = self.worker.committee_manager.current_shard()?;
         let mut prepare = states::Prepare::<T>::new(self.worker.node_address.clone(), shard);
         let payload_provider = SimplePayloadProvider {
-            payload: self.worker.payload.cloned().unwrap(),
+            payload: self.worker.payload.as_ref().map(|p| p.clone()),
         };
         let res = prepare
             .next_event(
@@ -331,7 +343,6 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         // let mut unit_of_work = self.chain_db.new_unit_of_work();
         let mut state = states::PreCommitState::<T>::new(
             self.worker.node_address.clone(),
-            self.worker.asset_definition.contract_id,
             self.worker.committee_manager.current_shard()?,
             self.worker.committee_manager.current_committee()?.clone(),
         );
@@ -354,7 +365,6 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         // let mut unit_of_work = self.chain_db.new_unit_of_work();
         let mut state = states::CommitState::<T>::new(
             self.worker.node_address.clone(),
-            self.worker.asset_definition.contract_id,
             self.worker.committee_manager.current_shard()?,
             self.worker.committee_manager.current_committee()?.clone(),
         );
@@ -377,7 +387,6 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
         // let mut unit_of_work = self.chain_db.new_unit_of_work();
         let mut state = states::DecideState::<T>::new(
             self.worker.node_address.clone(),
-            self.worker.asset_definition.contract_id,
             self.worker.committee_manager.current_shard()?,
             self.worker.committee_manager.current_committee()?.clone(),
         );
@@ -388,7 +397,7 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
                 &mut self.worker.inbound_connections,
                 &mut self.worker.outbound_service,
                 // unit_of_work.clone(),
-                &mut self.worker.payload_provider,
+                // &mut self.worker.payload_provider,
                 &self.worker.committee_manager,
             )
             .await?;
@@ -398,10 +407,11 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
             if let Some(mut state_tx) = self.worker.state_db_unit_of_work.take() {
                 state_tx.commit()?;
                 let signatures = state.collected_checkpoint_signatures();
-                self.worker
-                    .checkpoint_manager
-                    .create_checkpoint(state_tx.calculate_root()?, signatures)
-                    .await?;
+                todo!("Do I need to checkpoint?");
+                // self.worker
+                //     .checkpoint_manager
+                //     .create_checkpoint(state_tx.calculate_root()?, signatures)
+                //     .await?;
                 Ok(res)
             } else {
                 // technically impossible
@@ -416,11 +426,11 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
     }
 
     async fn next_view(&mut self) -> Result<ConsensusWorkerStateEvent, DigitalAssetError> {
-        info!(
-            target: LOG_TARGET,
-            "Status: {} in mempool ",
-            self.worker.payload_provider.get_payload_queue().await,
-        );
+        // info!(
+        //     target: LOG_TARGET,
+        //     "Status: {} in mempool ",
+        //     self.worker.payload_provider.get_payload_queue().await,
+        // );
         self.worker.state_db_unit_of_work = None;
         let mut state = states::NextViewState::<T>::new();
         state
@@ -431,8 +441,8 @@ impl<'a, T: ServiceSpecification> ConsensusWorkerProcessor<'a, T> {
                 &mut self.worker.outbound_service,
                 self.worker.committee_manager.current_committee()?,
                 self.worker.node_address.clone(),
-                &self.worker.asset_definition,
-                &self.worker.payload_provider,
+                // &self.worker.asset_definition,
+                // &self.worker.payload_provider,
                 self.shutdown,
             )
             .await

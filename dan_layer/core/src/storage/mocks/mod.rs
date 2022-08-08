@@ -73,13 +73,18 @@ impl DbFactory for MockDbFactory {
     }
 
     fn get_state_db(&self) -> Result<Option<StateDb<Self::StateDbBackendAdapter>>, StorageError> {
-        Ok(self.state_db.read().unwrap().cloned().map(|db| StateDb::new(db)))
+        Ok(self
+            .state_db
+            .read()
+            .unwrap()
+            .as_ref()
+            .map(|db| StateDb::new(db.clone())))
     }
 
     fn get_or_create_state_db(&self) -> Result<StateDb<Self::StateDbBackendAdapter>, StorageError> {
-        let guard = self.state_db.write().unwrap();
-        if let Some(x) = guard {
-            Ok(StateDb::new(x))
+        let mut guard = self.state_db.write().unwrap();
+        if let Some(x) = guard.as_ref() {
+            Ok(StateDb::new(x.clone()))
         } else {
             let x = MockStateDbBackupAdapter::default();
             *guard = Some(x.clone());

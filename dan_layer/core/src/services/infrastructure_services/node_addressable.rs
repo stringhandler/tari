@@ -27,10 +27,8 @@ use std::{
 
 use tari_comms::types::CommsPublicKey;
 
-pub trait NodeAddressable: Eq + Hash + Clone + Debug + Send + Sync + Display {}
+pub trait NodeAddressable: Eq + Hash + Clone + Debug + Send + Sync + Display + 'static {}
 
 impl NodeAddressable for String {}
-
-impl NodeAddressable for &str {}
 
 impl NodeAddressable for CommsPublicKey {}

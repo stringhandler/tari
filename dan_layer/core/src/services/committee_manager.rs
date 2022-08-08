@@ -31,7 +31,7 @@ use crate::{
     services::infrastructure_services::NodeAddressable,
 };
 
-pub trait CommitteeManager<TAddr: NodeAddressable> {
+pub trait CommitteeManager<TAddr: NodeAddressable>: Sync + Send + 'static {
     fn current_shard(&self) -> Result<Shard, DigitalAssetError>;
     fn current_committee(&self) -> Result<&Committee<TAddr>, DigitalAssetError>;
 

@@ -58,7 +58,6 @@ const LOG_TARGET: &str = "tari::dan::workers::states::commit";
 // TODO: This is very similar to pre-commit state
 pub struct CommitState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
-    contract_id: FixedHash,
     shard: Shard,
     committee: Committee<TSpecification::Addr>,
     received_new_view_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
@@ -66,15 +65,9 @@ pub struct CommitState<TSpecification: ServiceSpecification> {
 }
 
 impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
-    pub fn new(
-        node_id: TSpecification::Addr,
-        contract_id: FixedHash,
-        shard: Shard,
-        committee: Committee<TSpecification::Addr>,
-    ) -> Self {
+    pub fn new(node_id: TSpecification::Addr, shard: Shard, committee: Committee<TSpecification::Addr>) -> Self {
         Self {
             node_id,
-            contract_id,
             shard,
             committee,
             received_new_view_messages: HashMap::new(),
@@ -192,20 +185,20 @@ impl<TSpecification: ServiceSpecification> CommitState<TSpecification> {
             .await
     }
 
-    fn generate_checkpoint_signature(&self) -> SignerSignature {
-        // TODO: wire in the signer secret (probably node identity)
-        let signer_secret = PrivateKey::random(&mut OsRng);
-        // TODO: Validators should have agreed on a checkpoint commitment and included this in the signature for base
-        //       layer validation
-        let commitment = Commitment::default();
-        // TODO: We need the finalized state root to be able to produce a signature
-        let state_root = FixedHash::zero();
-        // TODO: Load next checkpoint number from db
-        let checkpoint_number = 0;
-
-        let challenge = CheckpointChallenge::new(&self.contract_id, &commitment, state_root, checkpoint_number);
-        SignerSignature::sign(&signer_secret, challenge)
-    }
+    // fn generate_checkpoint_signature(&self) -> SignerSignature {
+    //     TODO: wire in the signer secret (probably node identity)
+    //     let signer_secret = PrivateKey::random(&mut OsRng);
+    //     TODO: Validators should have agreed on a checkpoint commitment and included this in the signature for base
+    //           layer validation
+    // let commitment = Commitment::default();
+    // TODO: We need the finalized state root to be able to produce a signature
+    // let state_root = FixedHash::zero();
+    // TODO: Load next checkpoint number from db
+    // let checkpoint_number = 0;
+    //
+    // let challenge = CheckpointChallenge::new(&self.contract_id, &commitment, state_root, checkpoint_number);
+    // SignerSignature::sign(&signer_secret, challenge)
+    // }
 
     fn create_qc(&self, current_view: &View) -> Option<QuorumCertificate> {
         // // TODO: This can be done in one loop instead of two

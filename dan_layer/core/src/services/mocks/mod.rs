@@ -337,7 +337,7 @@ pub struct MockCommitteeManager<TAddr: NodeAddressable> {
     pub in_shard: Shard,
 }
 
-impl<TAddr: NodeAddressable> CommitteeManager<TAddr> for MockCommitteeManager<TAddr> {
+impl<TAddr: NodeAddressable + 'static> CommitteeManager<TAddr> for MockCommitteeManager<TAddr> {
     fn current_shard(&self) -> Result<Shard, DigitalAssetError> {
         Ok(self.in_shard.clone())
     }

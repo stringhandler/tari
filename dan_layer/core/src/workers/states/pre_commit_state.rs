@@ -53,7 +53,6 @@ const LOG_TARGET: &str = "tari::dan::workers::states::precommit";
 
 pub struct PreCommitState<TSpecification: ServiceSpecification> {
     node_id: TSpecification::Addr,
-    contract_id: FixedHash,
     committee: Committee<TSpecification::Addr>,
     shard: Shard,
     received_prepare_messages: HashMap<TSpecification::Addr, HotStuffMessage<TSpecification::Payload>>,
@@ -61,15 +60,9 @@ pub struct PreCommitState<TSpecification: ServiceSpecification> {
 }
 
 impl<TSpecification: ServiceSpecification> PreCommitState<TSpecification> {
-    pub fn new(
-        node_id: TSpecification::Addr,
-        contract_id: FixedHash,
-        shard: Shard,
-        committee: Committee<TSpecification::Addr>,
-    ) -> Self {
+    pub fn new(node_id: TSpecification::Addr, shard: Shard, committee: Committee<TSpecification::Addr>) -> Self {
         Self {
             node_id,
-            contract_id,
             shard,
             committee,
             received_prepare_messages: HashMap::new(),

@@ -85,7 +85,7 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         committee_manager: &TSpecification::CommitteeManager,
         inbound_services: &TSpecification::InboundConnectionService,
         outbound_service: &mut TSpecification::OutboundService,
-        payload_provider: &mut TPayloadProvider,
+        payload_provider: &TPayloadProvider,
         signing_service: &TSpecification::SigningService,
         payload_processor: &mut TSpecification::PayloadProcessor,
         // mut chain_tx: TChainDbUnitOfWork,
@@ -419,7 +419,9 @@ impl<TSpecification: ServiceSpecification> Prepare<TSpecification> {
         chain_tx: &mut TUnitOfWork,
     ) -> Result<bool, StorageError> {
         let locked_qc = chain_tx.get_locked_qc()?;
-        Ok(self.does_extend(node, locked_qc.node_hash()) || quorum_certificate.view_number() > locked_qc.view_number())
+        todo!("Fix safe node")
+        // Ok(self.does_extend(node, locked_qc.node_hash()) || quorum_certificate.view_number() >
+        // locked_qc.view_number())
     }
 
     async fn send_vote_to_leader(

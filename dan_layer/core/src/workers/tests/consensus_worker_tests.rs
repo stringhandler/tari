@@ -20,6 +20,8 @@
 //  WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
 //  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::sync::{atomic::AtomicBool, Arc};
+
 use tari_comms::NodeIdentity;
 use tari_dan_common_types::{Shard, ShardKey};
 use tari_dan_engine::state::mocks::state_db::MockStateDbBackupAdapter;
@@ -55,7 +57,10 @@ use crate::{
         ConcreteMempoolService,
         ServiceSpecification,
     },
-    storage::mocks::{chain_db::MockChainDbBackupAdapter, MockDbFactory},
+    storage::{
+        global::ContractState::Shutdown,
+        mocks::{chain_db::MockChainDbBackupAdapter, MockDbFactory},
+    },
     workers::{single_payload_consensus_worker::SinglePayloadConsensusWorker, ConsensusWorkerBuilder},
 };
 
@@ -108,7 +113,7 @@ fn create_workers_in_shards(
 pub enum SimplePayload {
     Empty,
     StateChange {
-        is_up: bool,
+        is_unspent: bool,
         data: Option<u8>,
         shard_key: ShardKey,
     },
@@ -148,17 +153,17 @@ impl ConsensusHash for SimplePayload {
 }
 
 impl SimplePayload {
-    pub fn bring_up(data: u8, shard_key: u8) -> Self {
+    pub fn create(data: u8, shard_key: u8) -> Self {
         Self::StateChange {
-            is_up: true,
+            is_unspent: true,
             data: Some(data),
             shard_key: ShardKey::new(vec![shard_key]),
         }
     }
 
-    pub fn bring_down(shard_key: u8) -> Self {
+    pub fn destroy(shard_key: u8) -> Self {
         Self::StateChange {
-            is_up: false,
+            is_unspent: false,
             data: None,
             shard_key: ShardKey::new(vec![shard_key]),
         }
@@ -203,18 +208,17 @@ pub async fn two_shards() {
     let network = create_mock_network();
     let mut workers = create_workers_in_shards(2, &network);
     dbg!("hello");
-    let output1 = SimplePayload::bring_up(5, 0);
-    let output2 = SimplePayload::bring_up(7, 1);
-    workers[0].payload_provider_mut().push(output1);
+    let output1 = SimplePayload::create(5, 0);
+    let output2 = SimplePayload::create(7, 1);
     network.print_all_messages();
 
     let mut worker_one = workers.pop().unwrap();
     let mut worker_two = workers.pop().unwrap();
     let t1 = tokio::spawn(async move {
-        worker_one.step().await.unwrap();
+        worker_one.step(output1).await.unwrap();
     });
     let t2 = tokio::spawn(async move {
-        worker_two.step().await.unwrap();
+        worker_two.step(output2).await.unwrap();
     });
     let (res, res2) = join!(t1, t2);
     network.print_all_messages();

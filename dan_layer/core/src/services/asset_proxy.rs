@@ -234,33 +234,34 @@ impl<TServiceSpecification: ServiceSpecification<Addr = PublicKey>> AssetProxy
         sender: PublicKey,
     ) -> Result<(), DigitalAssetError> {
         // check if we are processing this asset
-        if self.db_factory.get_state_db(contract_id)?.is_some() {
-            let instruction = Instruction::new(
-                template_id,
-                method.clone(),
-                args.clone(),
-                sender.clone(), /* TokenId(request.token_id.clone()),
-                                 * TODO: put signature in here
-                                 * ComSig::default()
-                                 * create_com_sig_from_bytes(&request.signature)
-                                 *     .map_err(|err| Status::invalid_argument("signature was not a valid
-                                 * comsig"))?, */
-            );
-            let mut mempool = self.mempool.clone();
-            mempool.submit_instruction(instruction).await
-        } else {
-            let _result = self
-                .forward_to_committee(
-                    *contract_id,
-                    InvokeType::InvokeMethod,
-                    template_id,
-                    method,
-                    args,
-                    sender,
-                )
-                .await?;
-            Ok(())
-        }
+        // if self.db_factory.get_state_db(contract_id)?.is_some() {
+        //     let instruction = Instruction::new(
+        //         template_id,
+        //         method.clone(),
+        //         args.clone(),
+        //         sender.clone(), /* TokenId(request.token_id.clone()),
+        //                          * TODO: put signature in here
+        //                          * ComSig::default()
+        //                          * create_com_sig_from_bytes(&request.signature)
+        //                          * .map_err(|err| Status::invalid_argument("signature was not a valid
+        //                          * comsig"))?, */
+        //     );
+        //     let mut mempool = self.mempool.clone();
+        //     mempool.submit_instruction(instruction).await
+        // } else {
+        //     let _result = self
+        //         .forward_to_committee(
+        //             *contract_id,
+        //             InvokeType::InvokeMethod,
+        //             template_id,
+        //             method,
+        //             args,
+        //             sender,
+        //         )
+        //         .await?;
+        //     Ok(())
+        // }
+        todo!()
     }
 
     async fn invoke_read_method(
