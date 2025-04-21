@@ -21,7 +21,7 @@ pub const KEY_LENGTH: usize = 32;
 macro_rules! hash_type {
     ($name: ident) => {
         /// A wrapper around a 32-byte hash value. Provides convenience functions to display as hex or binary
-        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Deserialize, Serialize)]
+        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Deserialize, Serialize, Hash)]
         pub struct $name([u8; KEY_LENGTH]);
 
         #[allow(clippy::len_without_is_empty)]

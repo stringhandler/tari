@@ -8,16 +8,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::sparse_merkle_tree::{
     bit_utils::{traverse_direction, TraverseDirection},
-    EmptyNode,
-    ExclusionProof,
-    LeafNode,
-    Node,
+    EmptyNode, ExclusionProof, LeafNode, Node,
     Node::{Branch, Empty, Leaf},
-    NodeHash,
-    NodeKey,
-    SMTError,
-    ValueHash,
+    NodeHash, NodeKey, SMTError, ValueHash,
 };
+
+use super::smt_snapshot::SmtSnapshot;
 
 #[derive(Debug, PartialEq)]
 pub enum UpdateResult {
@@ -71,7 +67,7 @@ enum PathClassifier {
     NonTerminalBranch,
 }
 
-/// Private struct, representing a terminal node in the tree. A terminal node is on that should house the key we've been
+/// Private struct, representing a terminal node in the tree. A terminal node is one that should house the key we've been
 /// searching for in a CRUD operation. The parent must exist (there's special handling for the root elsewhere) and is
 /// a branch node by definition.
 ///
@@ -153,8 +149,8 @@ impl<H: Digest<OutputSize = U32>> TerminalBranch<'_, H> {
             // The last branch has two non-empty nodes by definition, so it's always F.
             .skip(1)
             .take_while(|b| **b)
-            .count() +
-            1; // Account for the last branch
+            .count()
+            + 1; // Account for the last branch
         let parent = self.parent.as_branch_mut().ok_or(SMTError::UnexpectedNodeType)?;
         let depth = (parent.height() + 1)
             .checked_sub(branches_to_prune)
@@ -192,6 +188,10 @@ impl<H: Digest<OutputSize = U32>> SparseMerkleTree<H> {
     /// Returns true if the entire Merkle tree is empty.
     pub fn is_empty(&self) -> bool {
         self.root.is_empty()
+    }
+
+    pub fn create_snapshot<'a>(&'a self) -> SmtSnapshot<'a, H> {
+        SmtSnapshot::new(&self)
     }
 
     /// Attempts to delete the value at the location `key`. If the tree contains the key, the deleted value hash is
@@ -431,11 +431,7 @@ mod test {
 
     use crate::sparse_merkle_tree::{
         tree::{DeleteResult, SparseMerkleTree},
-        NodeKey,
-        SMTError,
-        UpdateResult,
-        ValueHash,
-        EMPTY_NODE_HASH,
+        NodeKey, SMTError, UpdateResult, ValueHash, EMPTY_NODE_HASH,
     };
 
     fn short_key(v: u8) -> NodeKey {

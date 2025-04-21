@@ -34,16 +34,13 @@ use tari_utilities::ByteArray;
 
 use crate::{
     blocks::{block::Block, BlockHeader, BlockHeaderAccumulatedData, ChainBlock},
-    input_mr_hash_from_pruned_mmr,
-    kernel_mr_hash_from_mmr,
-    output_mr_hash_from_smt,
+    input_mr_hash_from_pruned_mmr, kernel_mr_hash_from_mmr,
     proof_of_work::{AccumulatedDifficulty, Difficulty, PowAlgorithm, PowData, ProofOfWork},
     transactions::{
         aggregated_body::AggregateBody,
         transaction_components::{TransactionInput, TransactionKernel, TransactionOutput},
     },
-    OutputSmt,
-    PrunedInputMmr,
+    OutputSmt, PrunedInputMmr,
 };
 
 /// Returns the genesis block for the selected network.
@@ -115,7 +112,7 @@ fn print_mr_values(block: &mut Block, print: bool) {
     }
 
     block.header.kernel_mr = kernel_mr_hash_from_mmr(&kernel_mmr).unwrap();
-    block.header.output_mr = output_mr_hash_from_smt(&mut output_smt).unwrap();
+    block.header.output_mr = FixedHash::try_from(output_smt.hash().as_slice()).unwrap();
     block.header.input_mr = input_mr_hash_from_pruned_mmr(&input_mmr).unwrap();
     block.header.validator_node_mr = FixedHash::try_from(vn_mmr).unwrap();
     println!();
@@ -532,8 +529,7 @@ mod test {
             CryptoFactories,
         },
         validation::{ChainBalanceValidator, FinalHorizonStateValidation},
-        KernelMmr,
-        PrunedOutputMmr,
+        KernelMmr, PrunedOutputMmr,
     };
     #[test]
     #[serial]

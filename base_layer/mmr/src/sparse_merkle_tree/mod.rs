@@ -80,6 +80,7 @@ mod bit_utils;
 mod error;
 mod node;
 mod proofs;
+mod smt_snapshot;
 mod tree;
 
 pub use error::SMTError;
