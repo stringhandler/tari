@@ -41,13 +41,19 @@ use crate::{
         ban::PeerBanManager,
         hooks::Hooks,
         horizon_state_sync::{HorizonSyncInfo, HorizonSyncStatus},
-        rpc,
-        rpc::BaseNodeSyncRpcClient,
+        rpc::{self, BaseNodeSyncRpcClient},
         BlockchainSyncConfig,
         SyncPeer,
     },
     blocks::{BlockHeader, ChainHeader, UpdateBlockAccumulatedData},
-    chain_storage::{async_db::AsyncBlockchainDb, BlockchainBackend, ChainStorageError, MmrTree},
+    chain_storage::{
+        async_db::AsyncBlockchainDb,
+        BlockchainBackend,
+        ChainStorageError,
+        LmdbTreeReader,
+        MmrTree,
+        SmtHasher,
+    },
     common::{rolling_avg::RollingAverageTime, BanPeriod},
     consensus::ConsensusManager,
     proto::base_node::{sync_utxos_response::Txo, SyncKernelsRequest, SyncUtxosRequest, SyncUtxosResponse},
@@ -61,6 +67,7 @@ use crate::{
         helpers::validate_output_version,
         FinalHorizonStateValidation,
     },
+    OutputSmtHashDomain,
     PrunedKernelMmr,
 };
 
@@ -618,7 +625,7 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
         };
         let mut output_stream = client.sync_utxos(req).await?;
 
-        // let mut txn = db.write_transaction();
+        let mut txn = db.write_transaction();
         let mut utxo_counter = 0u64;
         let mut stxo_counter = 0u64;
         // let mut output_smt = (*db.inner().smt_write_access()?).clone();
@@ -666,6 +673,10 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
                         validate_individual_output(&output, &constants)?;
 
                         batch_verify_range_proofs(&self.prover, &[&output])?;
+                        // let smt_key = KeyHash(output.commitment.as_bytes().try_into().expect("commitment is 32
+                        // bytes")); let smt_value = output.smt_hash(current_header.height);
+                        // batch.push((smt_key, Some(smt_value.to_vec())));
+                        // let (root, updates) = jmt.put_value_set()
                         // let smt_key = NodeKey::try_from(output.commitment.as_bytes())?;
                         // let smt_node = ValueHash::try_from(output.smt_hash(current_header.height).as_slice())?;
                         // if let Err(e) = output_smt.insert(smt_key, smt_node) {
@@ -676,7 +687,13 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
                         //     );
                         //     return Err(e.into());
                         // }
-                        todo!("Implement smt changes");
+                        txn.insert_output_via_horizon_sync(
+                            output.clone(),
+                            current_header.hash(),
+                            current_header.height,
+                            current_header.timestamp.as_u64(),
+                        );
+                        // todo!("Implement smt changes");
                         // txn.insert_output_via_horizon_sync(
                         //     output,
                         //     current_header.hash(),
@@ -685,7 +702,8 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
                         // );
 
                         // // We have checked the range proof, and we have checked that the linked to header exists.
-                        // txn.commit().await?;
+                        txn.commit().await?;
+                        // txn.commit().await.unwrap();
                     }
                 },
                 Txo::Commitment(commitment_bytes) => {
@@ -718,7 +736,10 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
                             //         ));
                             //     },
                             // };
-                            todo!("Implement smt changes");
+
+                            // Not needed for JMT, I think?
+
+                            // todo!("Implement smt changes");
                             // This will only be committed once the SMT has been verified due to rewind difficulties if
                             // we need to abort the sync
                             // inputs_to_delete.push((output_hash, commitment));
@@ -762,7 +783,7 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
         //      it.
         // 3. In both cases it would be impossible to verify the SMT per block, as we would not be able to update the
         //    SMT with the outputs that were created and spent within the tranche.
-        todo!("Implement SMT check");
+        // todo!("Implement SMT check");
         // HorizonStateSynchronization::<B>::check_output_smt_root_hash(&mut output_smt, to_header)?;
 
         // // Commit in chunks to avoid locking the database for too long
@@ -783,6 +804,27 @@ impl<'a, B: BlockchainBackend + 'static> HorizonStateSynchronization<'a, B> {
         //     timer.elapsed()
         // );
         // Ok(())
+        let root = db
+            .fetch_and_calculate_smt_root_for_horizon_block(to_header.height)
+            .await?;
+        dbg!(&root);
+        dbg!(&to_header.output_mr);
+        if root != to_header.output_mr {
+            return Err(HorizonSyncError::InvalidMrRoot {
+                mr_tree: "JMT".to_string(),
+                at_height: to_header.height,
+                expected_hex: to_header.hash().to_hex(),
+                actual_hex: root.to_hex(),
+            });
+        }
+        debug!(
+            target: LOG_TARGET,
+            "Finished syncing TXOs: {} unspent and {} spent downloaded in {:.2?}",
+            utxo_counter,
+            stxo_counter,
+            last_sync_timer.elapsed()
+        );
+        Ok(())
     }
 
     // Helper function to check the output SMT root hash against the expected root hash.

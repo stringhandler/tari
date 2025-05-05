@@ -55,6 +55,7 @@ use crate::{
         DbTransaction,
         HorizonData,
         MmrTree,
+        OwnedLmdbTreeReader,
         TargetDifficulties,
     },
     common::rolling_vec::RollingVec,
@@ -139,6 +140,13 @@ impl<B: BlockchainBackend + 'static> AsyncBlockchainDb<B> {
 
     pub fn fetch_genesis_block(&self) -> ChainBlock {
         self.db.fetch_genesis_block()
+    }
+
+    pub async fn fetch_and_calculate_smt_root_for_horizon_block(
+        &self,
+        height: u64,
+    ) -> Result<HashOutput, ChainStorageError> {
+        self.db.fetch_and_calculate_smt_root_for_horizon_block(height)
     }
 }
 
@@ -348,7 +356,7 @@ impl<'a, B: BlockchainBackend + 'static> AsyncDbTransaction<'a, B> {
         timestamp: u64,
     ) -> &mut Self {
         self.transaction
-            .insert_utxo(output, header_hash, header_height, timestamp);
+            .insert_utxo_for_horizon(output, header_hash, header_height, timestamp);
         self
     }
 

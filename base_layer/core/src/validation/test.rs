@@ -312,7 +312,7 @@ async fn chain_balance_validation() {
     let mut mmr_position = 4;
 
     txn.insert_kernel(kernel.clone(), *header1.hash(), mmr_position);
-    txn.insert_utxo(coinbase.clone(), *header1.hash(), 1, 0);
+    txn.insert_utxo_for_horizon(coinbase.clone(), *header1.hash(), 1, 0);
 
     db.commit(txn).unwrap();
     utxo_sum = &coinbase.commitment.to_commitment().unwrap() + &utxo_sum;
@@ -376,7 +376,7 @@ async fn chain_balance_validation() {
     txn.insert_chain_header(header2.clone());
     utxo_sum = &coinbase.commitment.to_commitment().unwrap() + &utxo_sum;
     kernel_sum = &kernel.excess.to_commitment().unwrap() + &kernel_sum;
-    txn.insert_utxo(coinbase, *header2.hash(), 2, 0);
+    txn.insert_utxo_for_horizon(coinbase, *header2.hash(), 2, 0);
     mmr_position += 1;
     txn.insert_kernel(kernel, *header2.hash(), mmr_position);
 
@@ -566,7 +566,7 @@ async fn chain_balance_validation_burned() {
     let mut mmr_position = 4;
 
     txn.insert_kernel(kernel.clone(), *header1.hash(), mmr_position);
-    txn.insert_utxo(coinbase.clone(), *header1.hash(), 1, 0);
+    txn.insert_utxo_for_horizon(coinbase.clone(), *header1.hash(), 1, 0);
 
     mmr_position = 5;
 

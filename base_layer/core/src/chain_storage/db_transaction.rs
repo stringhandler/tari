@@ -109,14 +109,14 @@ impl DbTransaction {
     }
 
     /// Adds a UTXO into the current transaction and update the TXO MMR.
-    pub fn insert_utxo(
+    pub fn insert_utxo_for_horizon(
         &mut self,
         utxo: TransactionOutput,
         header_hash: HashOutput,
         header_height: u64,
         timestamp: u64,
     ) -> &mut Self {
-        self.operations.push(WriteOperation::InsertOutput {
+        self.operations.push(WriteOperation::InsertOutputForHorizon {
             header_hash,
             header_height,
             timestamp,
@@ -296,7 +296,7 @@ pub enum WriteOperation {
         kernel: Box<TransactionKernel>,
         mmr_position: u64,
     },
-    InsertOutput {
+    InsertOutputForHorizon {
         header_hash: HashOutput,
         header_height: u64,
         timestamp: u64,
@@ -383,7 +383,7 @@ impl fmt::Display for WriteOperation {
                 header_hash,
                 mmr_position
             ),
-            InsertOutput {
+            InsertOutputForHorizon {
                 header_hash,
                 header_height,
                 output,

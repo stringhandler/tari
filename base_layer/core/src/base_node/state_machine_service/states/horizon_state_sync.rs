@@ -137,6 +137,7 @@ impl HorizonStateSync {
                     randomx_vm_cnt,
                     randomx_vm_flags,
                 });
+                dbg!(&err);
                 warn!(target: LOG_TARGET, "Synchronizing horizon state has failed. {}", err);
                 StateEvent::HorizonStateSyncFailure
             },

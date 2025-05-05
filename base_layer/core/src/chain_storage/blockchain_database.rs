@@ -420,6 +420,18 @@ where B: BlockchainBackend
         db.write(transaction)
     }
 
+    pub fn fetch_and_calculate_smt_root_for_horizon_block(&self, height: u64) -> Result<FixedHash, ChainStorageError> {
+        let db = self.db_read_access()?;
+        let smt_reader = db.create_smt_reader()?;
+        let smt = JellyfishMerkleTree::<_, SmtHasher>::new(&smt_reader);
+        let root = smt
+            .get_root_hash(height)
+            .map_err(|e| ChainStorageError::JellyfishMerkleTreeError(e))?
+            .0
+            .into();
+        Ok(root)
+    }
+
     /// Returns the height of the current longest chain. This method will only fail if there's a fairly serious
     /// synchronisation problem on the database. You can try calling [BlockchainDatabase::try_recover_metadata] in
     /// that case to re-sync the metadata; or else just exit the program.

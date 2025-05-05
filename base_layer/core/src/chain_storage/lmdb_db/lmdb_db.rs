@@ -380,12 +380,29 @@ impl LMDBDatabase {
                 } => {
                     self.insert_kernel(&write_txn, header_hash, kernel, *mmr_position)?;
                 },
-                InsertOutput {
+                InsertOutputForHorizon {
                     header_hash,
                     header_height,
                     timestamp,
                     output,
                 } => {
+                    let reader = LmdbTreeReader::new(&write_txn, self.jmt_node_data.clone());
+                    let jmt = JellyfishMerkleTree::<_, SmtHasher>::new(&reader);
+                    let smt_key = KeyHash(output.commitment.as_bytes().try_into().expect("commitment is 32 bytes"));
+                    let smt_value = output.smt_hash(*header_height).to_vec();
+                    let (_root, updates) = jmt
+                        .put_value_set(vec![(smt_key, Some(smt_value))], *header_height)
+                        .map_err(|e| ChainStorageError::JellyfishMerkleTreeError(e.into()))?;
+                    let mut writer = LmdbTreeWriter::new(
+                        &write_txn,
+                        self.jmt_node_data.clone(),
+                        self.jmt_value_data.clone(),
+                        self.jmt_unique_key_data.clone(),
+                    );
+                    writer.allow_overwrite = true;
+                    writer
+                        .write_node_batch(&updates.node_batch)
+                        .map_err(|e| ChainStorageError::JellyfishMerkleTreeError(e.into()))?;
                     self.insert_output(&write_txn, header_hash, *header_height, *timestamp, output)?;
                 },
                 DeleteHeader(height) => {

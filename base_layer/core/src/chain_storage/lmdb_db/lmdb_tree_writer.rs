@@ -27,7 +27,12 @@ use tari_storage::lmdb_store::DatabaseRef;
 use tari_utilities::hex::Hex;
 
 use super::lmdb::lmdb_insert;
-use crate::chain_storage::lmdb_db::lmdb::{lmdb_delete, lmdb_delete_keys_starting_with, lmdb_fetch_matching_after};
+use crate::chain_storage::lmdb_db::lmdb::{
+    lmdb_delete,
+    lmdb_delete_keys_starting_with,
+    lmdb_fetch_matching_after,
+    lmdb_replace,
+};
 pub const LOG_TARGET: &str = "c::cs::lmdb_db::lmdb_tree_writer";
 
 pub(crate) struct LmdbTreeWriter<'a> {
@@ -35,6 +40,7 @@ pub(crate) struct LmdbTreeWriter<'a> {
     node_db: DatabaseRef,
     value_db: DatabaseRef,
     unique_key_db: DatabaseRef,
+    pub allow_overwrite: bool,
 }
 
 impl<'a> LmdbTreeWriter<'a> {
@@ -49,6 +55,7 @@ impl<'a> LmdbTreeWriter<'a> {
             node_db,
             value_db,
             unique_key_db,
+            allow_overwrite: false,
         }
     }
 
@@ -87,7 +94,12 @@ impl TreeWriter for LmdbTreeWriter<'_> {
             let mut lmdb_key: Vec<u8> = vec![];
             lmdb_key.extend_from_slice(&node_key.version().to_be_bytes());
             borsh::BorshSerialize::serialize(&node_key.nibble_path(), &mut lmdb_key)?;
-            lmdb_insert(self.txn, &self.node_db, &lmdb_key, &node, "jmt_node_table")?;
+
+            if self.allow_overwrite {
+                lmdb_replace(self.txn, &self.node_db, &lmdb_key, &node, None)?;
+            } else {
+                lmdb_insert(self.txn, &self.node_db, &lmdb_key, &node, "jmt_node_table")?;
+            }
         }
         // let mut duplicates = HashMap::new();
         for (value_key, value) in node_batch.values() {
