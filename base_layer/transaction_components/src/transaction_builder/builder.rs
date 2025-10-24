@@ -66,6 +66,7 @@ pub struct TransactionBuilder<KM> {
     kernel_features: KernelFeatures,
     burn_commitment: Option<CompressedCommitment>,
     own_address: TariAddress,
+    skip_memo_in_change: bool,
 }
 
 impl<KM> TransactionBuilder<KM>
@@ -101,7 +102,17 @@ where KM: TransactionKeyManagerInterface
             kernel_features: KernelFeatures::empty(),
             burn_commitment: None,
             own_address,
+            skip_memo_in_change: false,
         })
+    }
+
+    /// When set to true, the change output will not contain a memo field. Default is false.
+    /// This is useful for reducing the size of the change output when the memo is not needed.
+    /// For example, when the change output is sent back to the sender.
+    /// Note: This does not affect the memo fields of other outputs.
+    pub fn with_skip_memo_in_change(&mut self, skip: bool) -> &Self {
+        self.skip_memo_in_change = skip;
+        self
     }
 
     /// Set the fee per weight for the transaction. See (Fee::calculate)[Struct.Fee.html#calculate] for how the
@@ -512,6 +523,10 @@ where KM: TransactionKeyManagerInterface
     }
 
     async fn create_change_memo(&self, amount: MicroMinotari) -> Result<MemoField, TransactionBuilderError> {
+        if self.skip_memo_in_change {
+            return Ok(MemoField::default());
+        }
+
         let mut memo = MemoField::new_transaction_info(
             TariAddress::default(),
             MicroMinotari::default(),
@@ -1056,6 +1071,7 @@ impl<KM> Debug for TransactionBuilder<KM> {
             kernel_features,
             burn_commitment,
             own_address,
+            ..
         } = self;
 
         fmt::Debug::fmt(
