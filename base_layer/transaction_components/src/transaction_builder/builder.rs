@@ -1034,66 +1034,6 @@ where KM: TransactionKeyManagerInterface
         })
     }
 }
-// For some reason clippy picks up the debug impl as not used, and key_manager is a trait without debug, so we need to
-// manually implement Debug for TransactionBuilder
-#[allow(dead_code)]
-impl<KM> Debug for TransactionBuilder<KM> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        #[derive(Debug)]
-        pub struct TransactionBuilder<'a> {
-            consensus_constants: &'a ConsensusConstants,
-            fee_per_gram: &'a Option<MicroMinotari>,
-            fee: &'a MicroMinotari,
-            recipient_outputs: &'a Vec<RecipientDetails>,
-            inputs: &'a Vec<OutputPair>,
-            custom_outputs: &'a Vec<OutputPair>,
-            prevent_fee_gt_amount: &'a bool,
-            tx_type: &'a TxType,
-            memo_field: &'a Option<MemoField>,
-            lock_height: &'a u64,
-            kernel_features: &'a KernelFeatures,
-            burn_commitment: &'a Option<CompressedCommitment>,
-            own_address: &'a TariAddress,
-        }
-
-        let Self {
-            consensus_constants,
-            key_manager: _,
-            fee_per_gram,
-            fee,
-            recipient_outputs,
-            inputs,
-            custom_outputs,
-            prevent_fee_gt_amount,
-            tx_type,
-            memo_field,
-            lock_height,
-            kernel_features,
-            burn_commitment,
-            own_address,
-            ..
-        } = self;
-
-        fmt::Debug::fmt(
-            &TransactionBuilder {
-                consensus_constants,
-                fee_per_gram,
-                fee,
-                recipient_outputs,
-                inputs,
-                custom_outputs,
-                prevent_fee_gt_amount,
-                tx_type,
-                memo_field,
-                lock_height,
-                kernel_features,
-                burn_commitment,
-                own_address,
-            },
-            f,
-        )
-    }
-}
 
 #[cfg(test)]
 mod test {
